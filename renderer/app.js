@@ -240,7 +240,9 @@ function renderUpdate(s) {
     installBtn.hidden = false;
   } else if (s.stage === 'error') {
     title.textContent = 'Güncelleme hatası';
-    detail.textContent = s.error || '';
+    const msg = (s.error || '').split('\n')[0].slice(0, 120);
+    detail.textContent = msg;
+    detail.title = s.error || '';
   }
 }
 

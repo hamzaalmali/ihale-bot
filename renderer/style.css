@@ -452,9 +452,23 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
-.update-text strong { font-weight: 600; color: #064e3b; }
-.update-text .muted { color: #065f46; font-size: 0.78rem; }
+.update-text strong {
+  font-weight: 600;
+  color: #064e3b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.update-text .muted {
+  color: #065f46;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 .update-progress {
   width: 160px;
   height: 6px;
