@@ -39,10 +39,11 @@ function _stem(w) {
   return w.length > 5 ? w.slice(0, w.length - 2) : w;
 }
 function matchesKeywordInTitle(tender, kw) {
-  const hay = _norm((tender.name || '') + ' ' + (tender.authority || ''));
+  // Sadece ihale adı — idare adı yaygın kelimeler içerir (belediye, müdürlük vs),
+  // gürültü yapıyor. Filtre daha sıkı olsun.
+  const hay = _norm(tender.name || '');
   const tokens = _tokenize(kw);
   if (!tokens.length) return true;
-  // Tüm anahtar tokenların kök'ü başlık veya idarede geçsin
   return tokens.every((t) => hay.includes(_stem(t)));
 }
 function hitsBlacklist(tender, blacklist) {
@@ -119,6 +120,7 @@ async function runOnce() {
         // filteredOut sayısı post-loop log'da raporlanır
 
         let filteredOut = 0;
+        let skippedSeen = 0;
         for (const tender of tenders) {
           // Lokal filtre: başlıkta anahtar kelimenin kökü geçmeli
           if (cfg.strictTitleMatch !== false && !matchesKeywordInTitle(tender, kw)) {
@@ -132,8 +134,13 @@ async function runOnce() {
             continue;
           }
 
-          const dedupeKey = tender.ikn || `${kw}::${tender.name || tender.id}`;
-          if (!dedupeKey || seen.has(dedupeKey)) continue;
+          // Dedupe yalnızca IKN'ye (veya IKN yoksa normalize edilmiş başlığa) dayansın —
+          // aynı ihale birden fazla anahtar kelimeye eşleşse bile tek mesaj gider.
+          const dedupeKey = tender.ikn
+            || _norm(tender.name || '').slice(0, 160)
+            || String(tender.id || '');
+          if (!dedupeKey) { filteredOut++; continue; }
+          if (seen.has(dedupeKey)) { skippedSeen++; continue; }
           seen.add(dedupeKey);
           newIkns.push(dedupeKey);
 
@@ -161,8 +168,11 @@ async function runOnce() {
           storage.addMatch(record);
           emitMatch(record);
         }
-        if (filteredOut > 0) {
-          log(`  ${filteredOut} sonuç başlık/blacklist filtresinden elendi`);
+        if (filteredOut > 0 || skippedSeen > 0) {
+          const parts = [];
+          if (filteredOut > 0) parts.push(`${filteredOut} başlık/blacklist eledi`);
+          if (skippedSeen > 0) parts.push(`${skippedSeen} daha önce bildirilmiş`);
+          log('  ' + parts.join(' · '));
         }
       } catch (err) {
         log(`  "${kw}" hatası: ${err.message}`, 'error');

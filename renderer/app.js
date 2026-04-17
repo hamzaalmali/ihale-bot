@@ -43,14 +43,12 @@ async function loadConfig() {
 
 // Anahtar kelime önerileri
 const KEYWORD_PRESETS = {
-  elektrik: [
-    'scada', 'kontrol panosu', 'og pano', 'ag pano', 'og hücre',
+  elektrik_scada: [
+    'scada', 'otomasyon', 'plc', 'hmi', 'rtu',
+    'kontrol panosu', 'og pano', 'ag pano', 'og hücre',
     'transformatör', 'trafo', 'rmu', 'kesici', 'anahtarlama',
     'orta gerilim', 'alçak gerilim', 'modüler hücre', 'kompakt hücre',
-    'otomasyon panosu', 'elektrik dağıtım',
-  ],
-  scada: [
-    'scada', 'otomasyon', 'plc', 'hmi', 'rtu', 'uzaktan izleme',
+    'otomasyon panosu', 'elektrik dağıtım', 'uzaktan izleme',
     'enerji izleme', 'scada sistemi', 'kontrol sistemi',
   ],
 };
