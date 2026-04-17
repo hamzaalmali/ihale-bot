@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+
+# wppconnect oturum dosyaları — kullanıcıya özel, commit etme
+wa-tokens/
+tokens/
+userDataDir/

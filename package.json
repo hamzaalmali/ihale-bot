@@ -1,0 +1,113 @@
+{
+  "name": "baratoprak-enerji-ihale-bot",
+  "version": "1.0.0",
+  "description": "Baratoprak Enerji — EKAP v2 + ilan.gov.tr taraması yapar, anahtar kelime eşleşen ihaleleri WhatsApp üzerinden bildirir",
+  "main": "main.js",
+  "author": {
+    "name": "Baratoprak Enerji"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hamzaalmali/ihale-bot.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "release": "electron-builder --publish always",
+    "release:win": "electron-builder --win --publish always",
+    "release:mac": "electron-builder --mac --publish always",
+    "release:linux": "electron-builder --linux --publish always"
+  },
+  "dependencies": {
+    "@wppconnect-team/wppconnect": "^1.36.0",
+    "electron-updater": "^6.8.3",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.baratoprakenerji.ihaleBot",
+    "productName": "Baratoprak Enerji İhale Bot",
+    "copyright": "Copyright © 2026 Baratoprak Enerji",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "package.json",
+      "!**/*.md",
+      "!**/*.map",
+      "!**/.DS_Store"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@wppconnect-team/**",
+      "node_modules/puppeteer*/**",
+      "node_modules/@puppeteer/**",
+      "**/*.node"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hamzaalmali",
+        "repo": "ihale-bot",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "hamzaalmali-IhaleBot-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Baratoprak Enerji İhale Bot"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.business",
+      "artifactName": "hamzaalmali-IhaleBot-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office",
+      "artifactName": "hamzaalmali-IhaleBot-${version}.${ext}"
+    }
+  }
+}

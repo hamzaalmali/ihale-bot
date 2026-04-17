@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Baratoprak Enerji · İhale Bot</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // Navigasyon: app.js hata atsa bile çalışsın diye bağımsız event delegation.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.nav-item');
+      if (!btn) return;
+      const name = btn.getAttribute('data-tab');
+      if (!name) return;
+      document.querySelectorAll('.nav-item').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('.view').forEach((v) => {
+        v.classList.toggle('active', v.getAttribute('data-view') === name);
+      });
+    }, true);
+    // Global hata yakalayıcı — DevTools açık değilse bile görünür.
+    window.addEventListener('error', (ev) => {
+      const bar = document.getElementById('errBar');
+      if (bar) {
+        bar.hidden = false;
+        bar.textContent = 'Hata: ' + (ev.error?.message || ev.message || 'bilinmeyen');
+      }
+      console.error('[renderer]', ev.error || ev.message);
+    });
+    window.addEventListener('unhandledrejection', (ev) => {
+      const bar = document.getElementById('errBar');
+      if (bar) {
+        bar.hidden = false;
+        bar.textContent = 'Promise reddi: ' + (ev.reason?.message || ev.reason);
+      }
+      console.error('[renderer/promise]', ev.reason);
+    });
+  </script>
+</head>
+<body>
+  <div id="errBar" hidden style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:0.5rem 1rem;font:12px ui-monospace,Menlo,monospace"></div>
+  <div id="updateBar" class="update-bar" hidden>
+    <div class="update-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+    </div>
+    <div class="update-text">
+      <strong id="updateTitle">Güncelleme hazırlanıyor…</strong>
+      <span id="updateDetail" class="muted"></span>
+    </div>
+    <div class="update-progress"><div id="updateProgressBar"></div></div>
+    <div class="update-actions">
+      <button id="installUpdate" class="btn btn-primary btn-sm" hidden>Yeniden Başlat & Kur</button>
+      <button id="dismissUpdate" class="btn btn-ghost btn-sm">Gizle</button>
+    </div>
+  </div>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">Baratoprak Enerji</div>
+        <div class="brand-sub">İhale Bot · v<span id="appVersion">—</span></div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-tab="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/></svg>
+        Gösterge
+      </button>
+      <button class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Ayarlar
+      </button>
+      <button class="nav-item" data-tab="whatsapp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        WhatsApp
+      </button>
+      <button class="nav-item" data-tab="matches">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+        Eşleşmeler
+      </button>
+      <button class="nav-item" data-tab="logs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+        Günlük
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-chip" id="chipWA" data-kind="wa">
+        <span class="dot"></span><span class="label">WhatsApp</span>
+      </div>
+      <div class="status-chip" id="chipMon" data-kind="mon">
+        <span class="dot"></span><span class="label">İzleme</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Dashboard -->
+    <section class="view active" data-view="dashboard">
+      <header class="view-header">
+        <div>
+          <h1>Gösterge Paneli</h1>
+          <p class="view-sub">EKAP v2 tarama ve WhatsApp bildirim özeti</p>
+        </div>
+        <div class="view-actions">
+          <button id="runOnce" class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Şimdi Tara
+          </button>
+          <button id="startMon" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            İzlemeyi Başlat
+          </button>
+          <button id="stopMon" class="btn btn-ghost">Durdur</button>
+        </div>
+      </header>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Anahtar Kelime</div>
+          <div class="stat-value" id="statKeywords">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Alıcı</div>
+          <div class="stat-value" id="statRecipients">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Son Tarama</div>
+          <div class="stat-value small" id="statLastRun">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Sonraki Tarama</div>
+          <div class="stat-value small" id="statNextRun">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Toplam Eşleşme</div>
+          <div class="stat-value" id="statMatches">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Son 24 Saat</div>
+          <div class="stat-value" id="statMatches24">—</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head">
+            <h2>Canlı Günlük</h2>
+            <span class="muted" id="logCount">0 satır</span>
+          </div>
+          <div id="logBox" class="log"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Son Eşleşmeler</h2>
+            <button id="refreshMatches" class="btn btn-ghost btn-sm">Yenile</button>
+          </div>
+          <div id="matchPreview" class="match-list compact"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="view" data-view="settings">
+      <header class="view-header">
+        <div>
+          <h1>Ayarlar</h1>
+          <p class="view-sub">Arama kriterleri, alıcılar ve zamanlama</p>
+        </div>
+        <div class="view-actions">
+          <button id="checkUpdates" class="btn btn-ghost">Güncelleme Kontrol Et</button>
+          <button id="clearSeen" class="btn btn-ghost">Hafızayı Sıfırla</button>
+          <button id="saveConfig" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Kaydet
+          </button>
+        </div>
+      </header>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2 class="card-title">Arama Kriterleri</h2>
+          <label class="field">
+            <span>Anahtar Kelimeler</span>
+            <small>virgülle ayırın</small>
+            <input id="keywords" placeholder="inşaat, temizlik, yazılım" />
+          </label>
+          <label class="field">
+            <span>İhale Türleri</span>
+            <small>seçim yoksa tümü; çoklu için Ctrl/Cmd+tıklayın</small>
+            <select id="tenderTypes" multiple size="4">
+              <option value="1">Mal</option>
+              <option value="2">Yapım</option>
+              <option value="3">Hizmet</option>
+              <option value="4">Danışmanlık</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>İller (plaka)</span>
+            <small>boş = tümü; örn. 6, 34, 35</small>
+            <input id="provincePlates" placeholder="6, 34, 35" />
+          </label>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Zamanlama</h2>
+          <div class="grid-3">
+            <label class="field">
+              <span>Aralık</span>
+              <small>dakika</small>
+              <input id="interval" type="number" min="5" value="30" />
+            </label>
+            <label class="field">
+              <span>Geriye Bak</span>
+              <small>gün</small>
+              <input id="lookback" type="number" min="1" value="3" />
+            </label>
+            <label class="field">
+              <span>Limit</span>
+              <small>anahtar başına</small>
+              <input id="perKeywordLimit" type="number" min="1" max="100" value="30" />
+            </label>
+          </div>
+
+          <h2 class="card-title mt-lg">Alıcılar</h2>
+          <label class="field">
+            <span>WhatsApp Numaraları</span>
+            <small>ülke kodu ile, virgülle ayırın</small>
+            <input id="recipients" placeholder="905551112233, 905552223344" />
+          </label>
+        </div>
+
+        <div class="card wide">
+          <h2 class="card-title">Mesaj Şablonu</h2>
+          <p class="muted small">
+            Değişkenler:
+            <code>{keyword}</code> <code>{title}</code> <code>{authority}</code>
+            <code>{province}</code> <code>{tenderDate}</code> <code>{ikn}</code>
+            <code>{type}</code> <code>{status}</code> <code>{method}</code> <code>{url}</code>
+          </p>
+          <textarea id="template" rows="10" class="mono"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- WhatsApp -->
+    <section class="view" data-view="whatsapp">
+      <header class="view-header">
+        <div>
+          <h1>WhatsApp Bağlantısı</h1>
+          <p class="view-sub">wppconnect ile oturum yönetimi</p>
+        </div>
+        <div class="view-actions">
+          <button id="startWA" class="btn btn-primary">Bağlan</button>
+          <button id="stopWA" class="btn btn-ghost">Durdur</button>
+        </div>
+      </header>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2 class="card-title">Oturum Durumu</h2>
+          <div id="waStatus" class="status-box">durum: —</div>
+          <div id="qrArea" hidden>
+            <p class="muted small">QR kodunu telefonda <em>WhatsApp → Bağlı Cihazlar → Cihaz Bağla</em> menüsünden tarayın.</p>
+            <div class="qr-wrap"><img id="qrImg" alt="QR" /></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Test Mesajı</h2>
+          <p class="muted small">Bağlantı kurulduktan sonra doğrulamak için deneme mesajı gönderebilirsiniz.</p>
+          <label class="field">
+            <span>Numara</span>
+            <input id="testNumber" placeholder="905551112233" />
+          </label>
+          <label class="field">
+            <span>Metin</span>
+            <input id="testText" placeholder="merhaba" />
+          </label>
+          <button id="sendTest" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Gönder
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Matches -->
+    <section class="view" data-view="matches">
+      <header class="view-header">
+        <div>
+          <h1>Eşleşmeler</h1>
+          <p class="view-sub">Anahtar kelime ile eşleşen son ihaleler</p>
+        </div>
+        <div class="view-actions">
+          <input id="matchFilter" placeholder="Ara…" class="input-inline" />
+          <button id="refreshMatches2" class="btn btn-ghost">Yenile</button>
+        </div>
+      </header>
+      <div class="card">
+        <div id="matchBox" class="match-list"></div>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section class="view" data-view="logs">
+      <header class="view-header">
+        <div>
+          <h1>Günlük</h1>
+          <p class="view-sub">Canlı olay akışı</p>
+        </div>
+        <div class="view-actions">
+          <button id="clearLogs" class="btn btn-ghost">Temizle</button>
+        </div>
+      </header>
+      <div class="card no-pad">
+        <div id="logBoxFull" class="log full"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
