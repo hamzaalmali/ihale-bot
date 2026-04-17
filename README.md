@@ -4,8 +4,6 @@ EKAP v2 portalından (ve ilan.gov.tr'den) periyodik olarak ihale taraması yapan
 verdiğiniz anahtar kelimelerle eşleşen yeni ihaleleri WhatsApp üzerinden bildiren
 **Baratoprak Enerji** için özel Electron tabanlı masaüstü uygulama.
 
-- Dış MCP sunucusuna bağımlı değildir — Python [ihale-mcp](https://github.com/saidsurucu/ihale-mcp)
-  projesinin tüm işlevleri Node.js'e port edildi.
 - WhatsApp tarafı `@wppconnect-team/wppconnect` ile arka planda çalışır.
 - Yeni sürümler GitHub Releases üzerinden **otomatik** dağıtılır; uygulama
   açılışta ve her 4 saatte bir kontrol eder, yeni sürüm varsa sessizce indirip
