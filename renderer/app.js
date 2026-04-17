@@ -27,16 +27,41 @@ async function loadConfig() {
   el('keywords').value = (cfg.keywords || []).join(', ');
   el('recipients').value = (cfg.recipients || []).join(', ');
   el('interval').value = cfg.intervalMinutes ?? 30;
-  el('lookback').value = cfg.lookbackDays ?? 3;
+  el('lookback').value = cfg.lookbackDays ?? 7;
   el('perKeywordLimit').value = cfg.perKeywordLimit ?? 30;
   const selected = new Set((cfg.tenderTypes || []).map(String));
   for (const opt of el('tenderTypes').options) opt.selected = selected.has(opt.value);
   el('provincePlates').value = (cfg.provincePlates || []).join(', ');
+  if (el('searchType')) el('searchType').value = cfg.searchType || 'TumKelimeler';
   el('template').value = cfg.messageTemplate || '';
 
   el('statKeywords').textContent = (cfg.keywords || []).length || '0';
   el('statRecipients').textContent = (cfg.recipients || []).length || '0';
 }
+
+// Anahtar kelime önerileri
+const KEYWORD_PRESETS = {
+  elektrik: [
+    'scada', 'kontrol panosu', 'og pano', 'ag pano', 'og hücre',
+    'transformatör', 'trafo', 'rmu', 'kesici', 'anahtarlama',
+    'orta gerilim', 'alçak gerilim', 'modüler hücre', 'kompakt hücre',
+    'otomasyon panosu', 'elektrik dağıtım',
+  ],
+  scada: [
+    'scada', 'otomasyon', 'plc', 'hmi', 'rtu', 'uzaktan izleme',
+    'enerji izleme', 'scada sistemi', 'kontrol sistemi',
+  ],
+};
+document.querySelectorAll('[data-preset]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.preset;
+    const preset = KEYWORD_PRESETS[key] || [];
+    const current = splitList(el('keywords').value);
+    const merged = Array.from(new Set([...current, ...preset]));
+    el('keywords').value = merged.join(', ');
+    logLocal(`${preset.length} örnek anahtar kelime eklendi`);
+  });
+});
 
 on('saveConfig', 'click', async () => {
   const tenderTypes = Array.from(el('tenderTypes').selectedOptions).map((o) => parseInt(o.value, 10));
@@ -45,12 +70,15 @@ on('saveConfig', 'click', async () => {
     .filter((n) => Number.isFinite(n) && n >= 1 && n <= 81);
   const cfg = {
     keywords: splitList(el('keywords').value),
-    recipients: splitList(el('recipients').value).map((n) => n.replace(/\D/g, '')).filter(Boolean),
+    recipients: splitList(el('recipients').value)
+      .map((n) => (n.includes('@') ? n.trim() : n.replace(/\D/g, '')))
+      .filter(Boolean),
     intervalMinutes: parseInt(el('interval').value, 10) || 30,
-    lookbackDays: parseInt(el('lookback').value, 10) || 3,
+    lookbackDays: parseInt(el('lookback').value, 10) || 7,
     perKeywordLimit: parseInt(el('perKeywordLimit').value, 10) || 30,
     tenderTypes,
     provincePlates,
+    searchType: el('searchType')?.value || 'TumKelimeler',
     messageTemplate: el('template').value,
   };
   await api.setConfig(cfg);
@@ -90,6 +118,48 @@ on('clearLogs', 'click', () => {
 });
 on('matchFilter', 'input', refreshMatches);
 
+// ── Grup seçici ─────────────────────────────────────────────────────────────
+on('loadGroups', 'click', async () => {
+  const list = el('groupList');
+  if (!list) return;
+  list.hidden = false;
+  list.innerHTML = '<div class="group-empty">Gruplar yükleniyor…</div>';
+  try {
+    const groups = await api.listGroups();
+    if (!groups || !groups.length) {
+      list.innerHTML = '<div class="group-empty">Grup bulunamadı. WhatsApp\'a bağlı mısınız?</div>';
+      return;
+    }
+    const current = new Set(splitList(el('recipients').value));
+    list.innerHTML = groups
+      .map((g) => `
+        <label class="group-row">
+          <input type="checkbox" value="${esc(g.id)}" ${current.has(g.id) ? 'checked' : ''}>
+          <span class="g-name">${esc(g.name)}</span>
+          <span class="g-count">${g.participants || '?'} üye</span>
+        </label>
+      `)
+      .join('') +
+      `<div class="group-list-actions">
+        <button class="btn btn-ghost btn-sm" id="groupCancel">Kapat</button>
+        <button class="btn btn-primary btn-sm" id="groupApply">Seçilenleri Ekle</button>
+      </div>`;
+
+    el('groupApply').onclick = () => {
+      const selected = Array.from(list.querySelectorAll('input[type=checkbox]:checked'))
+        .map((c) => c.value);
+      const currentList = splitList(el('recipients').value);
+      const merged = Array.from(new Set([...currentList, ...selected]));
+      el('recipients').value = merged.join(', ');
+      list.hidden = true;
+      logLocal(`${selected.length} grup alıcı listesine eklendi`);
+    };
+    el('groupCancel').onclick = () => { list.hidden = true; };
+  } catch (err) {
+    list.innerHTML = `<div class="group-empty">Hata: ${esc(err.message)}</div>`;
+  }
+});
+
 // ── Events ──────────────────────────────────────────────────────────────────
 if (api.onQR) api.onQR((qr) => {
   if (el('qrArea')) el('qrArea').hidden = false;
@@ -123,13 +193,20 @@ function logLocal(msg) {
 }
 
 // ── WhatsApp/monitor status UI ──────────────────────────────────────────────
-const READY_STATUSES = ['isLogged', 'inChat', 'chatsAvailable', 'successChat', 'ready', 'qrReadSuccess'];
-const WARN_STATUSES = ['qr-bekliyor', 'starting', 'notLogged'];
-function updateWAStatus(s) {
-  el('waStatus').textContent = 'durum: ' + s;
+const READY_STATUSES = ['isLogged', 'inChat', 'chatsAvailable', 'successChat', 'ready', 'qrReadSuccess', 'CONNECTED'];
+const WARN_STATUSES = ['qr-bekliyor', 'starting', 'notLogged', 'INITIALIZING'];
+let waReady = false;
+function updateWAStatus(s, ready) {
+  if (typeof ready === 'boolean') waReady = ready;
+  if (el('waStatus')) el('waStatus').textContent = 'durum: ' + s + (waReady ? ' · hazır' : '');
   const chip = el('chipWA');
+  if (!chip) return;
   chip.classList.remove('ok', 'warn', 'err');
-  if (READY_STATUSES.includes(s)) { chip.classList.add('ok'); el('qrArea').hidden = true; }
+  const isReady = waReady || READY_STATUSES.includes(s) || String(s).toLowerCase().includes('chat');
+  if (isReady) {
+    chip.classList.add('ok');
+    const qr = el('qrArea'); if (qr) qr.hidden = true;
+  }
   else if (WARN_STATUSES.includes(s)) chip.classList.add('warn');
   else if (String(s).startsWith('error')) chip.classList.add('err');
 }
@@ -197,7 +274,7 @@ async function refreshMatches() {
 
 async function refreshStatuses() {
   const [wa, mon] = await Promise.all([api.whatsappStatus(), api.monitorStatus()]);
-  if (wa) updateWAStatus(wa.status || '—');
+  if (wa) updateWAStatus(wa.status || '—', !!wa.ready);
   updateMonChip(!!mon?.running);
 
   el('statLastRun').textContent = mon?.lastRun

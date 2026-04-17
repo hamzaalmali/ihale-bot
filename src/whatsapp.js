@@ -91,7 +91,11 @@ async function stop() {
 }
 
 function toJid(num) {
-  const digits = String(num || '').replace(/\D/g, '');
+  const s = String(num || '').trim();
+  if (!s) throw new Error('Geçersiz numara');
+  // Zaten JID formatında (kişi @c.us / grup @g.us)
+  if (s.includes('@')) return s;
+  const digits = s.replace(/\D/g, '');
   if (!digits) throw new Error('Geçersiz numara');
   return digits + '@c.us';
 }
@@ -101,9 +105,35 @@ async function sendMessage(number, text) {
   return client.sendText(toJid(number), text);
 }
 
+async function listGroups() {
+  if (!client || !state.ready) throw new Error('WhatsApp bağlı değil');
+  // wppconnect sürümüne göre farklı API adları olabilir — hepsini dene.
+  let raw = null;
+  try {
+    if (typeof client.getAllGroups === 'function') raw = await client.getAllGroups();
+    else if (typeof client.listChats === 'function') raw = await client.listChats({ onlyGroups: true });
+    else if (typeof client.getAllChats === 'function') raw = await client.getAllChats();
+  } catch (err) {
+    throw new Error('Grup listesi alınamadı: ' + err.message);
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((g) => {
+      const id = (g && (g.id?._serialized || g.id)) || '';
+      return String(id).includes('@g.us') || g.isGroup === true;
+    })
+    .map((g) => ({
+      id: g.id?._serialized || g.id,
+      name: g.name || g.formattedTitle || g.contact?.name || g.id?._serialized || g.id,
+      participants: g.groupMetadata?.participants?.length || g.participants?.length || 0,
+    }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'tr'));
+}
+
 exports.start = start;
 exports.stop = stop;
 exports.sendMessage = sendMessage;
+exports.listGroups = listGroups;
 exports.getStatus = () => ({ ...state });
 exports.isReady = () => state.ready;
 exports.onQR = (fn) => listeners.qr.push(fn);

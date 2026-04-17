@@ -188,7 +188,19 @@
           <label class="field">
             <span>Anahtar Kelimeler</span>
             <small>virgülle ayırın</small>
-            <input id="keywords" placeholder="inşaat, temizlik, yazılım" />
+            <input id="keywords" placeholder="scada, kontrol panosu, pano, og hücre, transformatör" />
+          </label>
+          <div class="row" style="margin-top:-0.4rem;margin-bottom:0.75rem;gap:0.4rem;flex-wrap:wrap">
+            <button type="button" class="btn btn-ghost btn-sm" data-preset="elektrik">⚡ Elektrik Dağıtım Örneği</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-preset="scada">🖥️ SCADA/Otomasyon</button>
+          </div>
+          <label class="field">
+            <span>Arama Modu</span>
+            <small>"Tüm Kelimeler": her kelime ayrı ayrı geçsin (panosu, panoları, pano da yakalar). "Girdiğim Gibi": tam ibare.</small>
+            <select id="searchType">
+              <option value="TumKelimeler">Tüm Kelimeler (önerilen)</option>
+              <option value="GirdigimGibi">Girdiğim Gibi (tam ibare)</option>
+            </select>
           </label>
           <label class="field">
             <span>İhale Türleri</span>
@@ -229,10 +241,17 @@
 
           <h2 class="card-title mt-lg">Alıcılar</h2>
           <label class="field">
-            <span>WhatsApp Numaraları</span>
-            <small>ülke kodu ile, virgülle ayırın</small>
-            <input id="recipients" placeholder="905551112233, 905552223344" />
+            <span>Numaralar ve Gruplar</span>
+            <small>numaralar ülke kodu ile; gruplar JID formatında (xxxxx@g.us). Virgülle ayırın.</small>
+            <input id="recipients" placeholder="905551112233, 120363XXX@g.us" />
           </label>
+          <div class="group-picker">
+            <div class="row spread">
+              <span class="muted small">WhatsApp gruplarınızdan seçin</span>
+              <button id="loadGroups" class="btn btn-ghost btn-sm">Grupları Yükle</button>
+            </div>
+            <div id="groupList" class="group-list" hidden></div>
+          </div>
         </div>
 
         <div class="card wide">

@@ -6,10 +6,11 @@ const DEFAULT_CONFIG = {
   keywords: [],
   recipients: [],
   intervalMinutes: 30,
-  lookbackDays: 3,
+  lookbackDays: 7,
   perKeywordLimit: 30,
   tenderTypes: [],      // [] = tümü, aksi halde 1=Mal, 2=Yapım, 3=Hizmet, 4=Danışmanlık
   provincePlates: [],   // plaka kodları (1-81), [] = tümü
+  searchType: 'TumKelimeler',  // 'GirdigimGibi' (tam ibare) veya 'TumKelimeler' (her kelime ayrı)
   messageTemplate:
     'Yeni ihale bulundu 🔔\n\n' +
     'Anahtar: {keyword}\n' +

@@ -75,6 +75,7 @@ async function runOnce() {
           announcementDateEnd: endDate,
           orderBy: 'ihaleTarihi',
           sortOrder: 'desc',
+          searchType: cfg.searchType || 'TumKelimeler',
           limit: cfg.perKeywordLimit || 30,
           tenderTypes: cfg.tenderTypes?.length ? cfg.tenderTypes : null,
           provinces: cfg.provincePlates?.length ? cfg.provincePlates : null,
