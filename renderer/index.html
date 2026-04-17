@@ -203,6 +203,19 @@
             </select>
           </label>
           <label class="field">
+            <span>Sıkı Başlık Eşleşmesi</span>
+            <small>Açık: sadece anahtar kelimenin kökü <em>ihale adında</em> geçerse bildirim gönderilir. Kapalı: EKAP ne döndürürse göndersin.</small>
+            <select id="strictTitleMatch">
+              <option value="true">Açık (önerilen)</option>
+              <option value="false">Kapalı</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Engelleme Listesi (Kara Liste)</span>
+            <small>Başlıkta bu kelimelerden biri geçerse ihale atlanır. Virgülle ayırın.</small>
+            <input id="blacklist" placeholder="giyim, yemek, tavuk, zemin kaplama, gübre, ilaç" />
+          </label>
+          <label class="field">
             <span>İhale Türleri</span>
             <small>seçim yoksa tümü; çoklu için Ctrl/Cmd+tıklayın</small>
             <select id="tenderTypes" multiple size="4">

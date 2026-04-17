@@ -27,6 +27,34 @@ function ymd(d) {
   return `${y}-${m}-${day}`;
 }
 
+// ── Basit Türkçe stem + eşleşme kontrolü ──────────────────────────────────
+function _norm(s) {
+  return String(s || '').toLocaleLowerCase('tr-TR');
+}
+function _tokenize(s) {
+  return _norm(s).split(/[^a-z0-9çğıöşü]+/i).filter(Boolean);
+}
+function _stem(w) {
+  // Son 2 ek karakterini at (Türkçe çekimler için genelde yeterli)
+  return w.length > 5 ? w.slice(0, w.length - 2) : w;
+}
+function matchesKeywordInTitle(tender, kw) {
+  const hay = _norm((tender.name || '') + ' ' + (tender.authority || ''));
+  const tokens = _tokenize(kw);
+  if (!tokens.length) return true;
+  // Tüm anahtar tokenların kök'ü başlık veya idarede geçsin
+  return tokens.every((t) => hay.includes(_stem(t)));
+}
+function hitsBlacklist(tender, blacklist) {
+  if (!blacklist || !blacklist.length) return null;
+  const hay = _norm(tender.name || '');
+  for (const b of blacklist) {
+    const nb = _norm(b);
+    if (nb && hay.includes(nb)) return b;
+  }
+  return null;
+}
+
 function formatMessage(tender, keyword, template) {
   const vars = {
     keyword,
@@ -88,8 +116,22 @@ async function runOnce() {
 
         const tenders = result.tenders || [];
         log(`  ${tenders.length} sonuç (toplam: ${result.total_count ?? '?'})`);
+        // filteredOut sayısı post-loop log'da raporlanır
 
+        let filteredOut = 0;
         for (const tender of tenders) {
+          // Lokal filtre: başlıkta anahtar kelimenin kökü geçmeli
+          if (cfg.strictTitleMatch !== false && !matchesKeywordInTitle(tender, kw)) {
+            filteredOut++;
+            continue;
+          }
+          // Kara liste: başlıkta engellenen kelime var mı?
+          const blHit = hitsBlacklist(tender, cfg.blacklist);
+          if (blHit) {
+            filteredOut++;
+            continue;
+          }
+
           const dedupeKey = tender.ikn || `${kw}::${tender.name || tender.id}`;
           if (!dedupeKey || seen.has(dedupeKey)) continue;
           seen.add(dedupeKey);
@@ -118,6 +160,9 @@ async function runOnce() {
 
           storage.addMatch(record);
           emitMatch(record);
+        }
+        if (filteredOut > 0) {
+          log(`  ${filteredOut} sonuç başlık/blacklist filtresinden elendi`);
         }
       } catch (err) {
         log(`  "${kw}" hatası: ${err.message}`, 'error');

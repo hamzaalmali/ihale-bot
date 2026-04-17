@@ -11,6 +11,8 @@ const DEFAULT_CONFIG = {
   tenderTypes: [],      // [] = tümü, aksi halde 1=Mal, 2=Yapım, 3=Hizmet, 4=Danışmanlık
   provincePlates: [],   // plaka kodları (1-81), [] = tümü
   searchType: 'TumKelimeler',  // 'GirdigimGibi' (tam ibare) veya 'TumKelimeler' (her kelime ayrı)
+  strictTitleMatch: true,  // true: anahtar kelimenin kökü ihale başlığında geçmeli
+  blacklist: [],           // başlıkta bu kelimelerden biri geçerse ihaleyi at
   messageTemplate:
     'Yeni ihale bulundu 🔔\n\n' +
     'Anahtar: {keyword}\n' +

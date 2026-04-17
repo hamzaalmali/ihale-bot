@@ -33,6 +33,8 @@ async function loadConfig() {
   for (const opt of el('tenderTypes').options) opt.selected = selected.has(opt.value);
   el('provincePlates').value = (cfg.provincePlates || []).join(', ');
   if (el('searchType')) el('searchType').value = cfg.searchType || 'TumKelimeler';
+  if (el('strictTitleMatch')) el('strictTitleMatch').value = String(cfg.strictTitleMatch !== false);
+  if (el('blacklist')) el('blacklist').value = (cfg.blacklist || []).join(', ');
   el('template').value = cfg.messageTemplate || '';
 
   el('statKeywords').textContent = (cfg.keywords || []).length || '0';
@@ -79,6 +81,8 @@ on('saveConfig', 'click', async () => {
     tenderTypes,
     provincePlates,
     searchType: el('searchType')?.value || 'TumKelimeler',
+    strictTitleMatch: (el('strictTitleMatch')?.value || 'true') === 'true',
+    blacklist: splitList(el('blacklist')?.value || ''),
     messageTemplate: el('template').value,
   };
   await api.setConfig(cfg);
