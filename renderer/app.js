@@ -219,24 +219,27 @@ function renderUpdate(s) {
   const installBtn = el('installUpdate');
   if (!bar) return;
 
-  if (updateDismissed && !['downloaded', 'error'].includes(s.stage)) return;
-
   const showBar = ['available', 'downloading', 'downloaded', 'error'].includes(s.stage);
-  bar.hidden = !showBar;
-  if (!showBar) return;
+  if (!showBar || (updateDismissed && s.stage !== 'downloaded' && s.stage !== 'error')) {
+    bar.hidden = true;
+    bar.classList.remove('error');
+    return;
+  }
+  bar.hidden = false;
+  bar.classList.toggle('error', s.stage === 'error');
 
   installBtn.hidden = true;
   progressBar.style.width = (s.progress || 0) + '%';
 
   if (s.stage === 'available') {
-    title.textContent = `Yeni sürüm hazırlanıyor: v${s.version}`;
+    title.textContent = `Yeni sürüm: v${s.version}`;
     detail.textContent = 'İndiriliyor…';
   } else if (s.stage === 'downloading') {
-    title.textContent = `Güncelleme indiriliyor: v${s.version ?? ''}`;
+    title.textContent = `v${s.version ?? ''} indiriliyor`;
     detail.textContent = `%${s.progress || 0}`;
   } else if (s.stage === 'downloaded') {
-    title.textContent = `v${s.version} indirildi, kurmaya hazır`;
-    detail.textContent = 'Yeniden başlatınca kurulum tamamlanacak.';
+    title.textContent = `v${s.version} hazır`;
+    detail.textContent = 'Yeniden başlatınca kurulacak';
     installBtn.hidden = false;
   } else if (s.stage === 'error') {
     title.textContent = 'Güncelleme hatası';

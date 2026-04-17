@@ -424,22 +424,44 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
 ::-webkit-scrollbar-track { background: transparent; }
 .log::-webkit-scrollbar-thumb { background: #334155; border: 2px solid #0b1220; }
 
-/* ───────────── Update banner ───────────── */
+/* ───────────── Update toast (sağ üst köşe) ───────────── */
+[hidden] { display: none !important; }
+
 .update-bar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  margin: -1.75rem -2rem 1.25rem;
-  padding: 0.7rem 1rem;
-  background: linear-gradient(90deg, #ecfdf5, #f0fdfa);
-  border-bottom: 1px solid #a7f3d0;
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 0.85rem 0.95rem;
+  background: #ffffff;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(6, 78, 59, 0.18), 0 2px 6px rgba(6, 78, 59, 0.08);
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+    "icon text"
+    "icon progress"
+    ".    actions";
+  gap: 0.5rem 0.75rem;
   font-size: 0.85rem;
   color: #064e3b;
+  animation: toastIn 0.25s ease;
 }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.update-bar.error { border-color: #fecaca; }
+.update-bar.error .update-icon { background: #ef4444; }
+.update-bar.error strong { color: #7f1d1d; }
+.update-bar.error .muted { color: #991b1b; }
+
 .update-icon {
+  grid-area: icon;
   width: 32px; height: 32px; border-radius: 8px;
   background: #10b981;
   color: #fff;
@@ -448,11 +470,12 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
 }
 .update-icon svg { width: 16px; height: 16px; }
 .update-text {
+  grid-area: text;
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-width: 0;
   overflow: hidden;
+  gap: 0.1rem;
 }
 .update-text strong {
   font-weight: 600;
@@ -460,22 +483,22 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.87rem;
 }
 .update-text .muted {
   color: #065f46;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 .update-progress {
-  width: 160px;
-  height: 6px;
+  grid-area: progress;
+  height: 5px;
   background: rgba(16,185,129,0.15);
   border-radius: 999px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 .update-progress > div {
   height: 100%;
@@ -484,7 +507,13 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
   border-radius: 999px;
   transition: width 0.25s ease;
 }
-.update-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+.update-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  margin-top: 0.1rem;
+}
 
 /* ───────────── Responsive ───────────── */
 @media (max-width: 1100px) {
