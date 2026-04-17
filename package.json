@@ -80,14 +80,17 @@
             "x64"
           ]
         }
-      ],
-      "artifactName": "hamzaalmali-IhaleBot-Setup-${version}.${ext}"
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Baratoprak Enerji İhale Bot"
+      "shortcutName": "Baratoprak Enerji İhale Bot",
+      "artifactName": "BaratoprakEnerji-IhaleBot-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "BaratoprakEnerji-IhaleBot-Portable-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -100,14 +103,14 @@
         }
       ],
       "category": "public.app-category.business",
-      "artifactName": "hamzaalmali-IhaleBot-${version}-${arch}.${ext}"
+      "artifactName": "BaratoprakEnerji-IhaleBot-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Office",
-      "artifactName": "hamzaalmali-IhaleBot-${version}.${ext}"
+      "artifactName": "BaratoprakEnerji-IhaleBot-${version}.${ext}"
     }
   }
 }
