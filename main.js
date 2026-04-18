@@ -4,6 +4,7 @@ const storage = require('./src/storage');
 const monitor = require('./src/monitor');
 const wa = require('./src/whatsapp');
 const updater = require('./src/updater');
+const ai = require('./src/ai');
 
 let win;
 
@@ -70,6 +71,10 @@ ipcMain.handle('monitor:status', () => monitor.getStatus());
 ipcMain.handle('monitor:runOnce', () => monitor.runOnce());
 ipcMain.handle('monitor:matches', () => storage.getMatches());
 ipcMain.handle('monitor:clearSeen', () => storage.clearSeen());
+
+ipcMain.handle('ai:test', async (_e, { apiKey, model }) => {
+  return ai.testConnection({ apiKey, model });
+});
 
 ipcMain.handle('updater:check', () => updater.checkForUpdates({ silent: false }));
 ipcMain.handle('updater:state', () => updater.getState());

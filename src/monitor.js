@@ -1,6 +1,7 @@
 const api = require('./core/api');
 const wa = require('./whatsapp');
 const storage = require('./storage');
+const ai = require('./ai');
 
 let timer = null;
 let running = false;
@@ -121,6 +122,7 @@ async function runOnce() {
 
         let filteredOut = 0;
         let skippedSeen = 0;
+        let aiRejected = 0;
         for (const tender of tenders) {
           // Lokal filtre: başlıkta anahtar kelimenin kökü geçmeli
           if (cfg.strictTitleMatch !== false && !matchesKeywordInTitle(tender, kw)) {
@@ -141,11 +143,40 @@ async function runOnce() {
             || String(tender.id || '');
           if (!dedupeKey) { filteredOut++; continue; }
           if (seen.has(dedupeKey)) { skippedSeen++; continue; }
+
+          // ── Yapay zeka ön-filtre (Google Gemini) ──
+          let aiVerdict = null;
+          if (cfg.aiEnabled && cfg.aiApiKey) {
+            try {
+              aiVerdict = await ai.classifyTender({
+                tender,
+                businessContext: cfg.aiBusinessContext,
+                keywords: cfg.keywords,
+                apiKey: cfg.aiApiKey,
+                model: cfg.aiModel || 'gemini-2.0-flash',
+              });
+              const minConf = typeof cfg.aiMinConfidence === 'number' ? cfg.aiMinConfidence : 0.5;
+              if (!aiVerdict.relevant || (aiVerdict.confidence !== null && aiVerdict.confidence < minConf)) {
+                aiRejected++;
+                log(`  🤖 atladı: ${tender.name?.slice(0, 70)} — ${aiVerdict.reason}`);
+                // dedupe'a yine de ekle ki tekrar AI'ya sormayalım
+                seen.add(dedupeKey);
+                newIkns.push(dedupeKey);
+                continue;
+              }
+              log(`  🤖 onayladı: ${tender.name?.slice(0, 70)} (güven %${Math.round((aiVerdict.confidence || 0) * 100)})`);
+            } catch (err) {
+              log(`  🤖 AI hatası, kelime filtresine göre devam: ${err.message}`, 'warn');
+            }
+            // Gemini free tier rate limit (15 RPM = ~4sn)
+            await new Promise((r) => setTimeout(r, 4500));
+          }
+
           seen.add(dedupeKey);
           newIkns.push(dedupeKey);
 
           const message = formatMessage(tender, kw, cfg.messageTemplate);
-          const record = { keyword: kw, ikn: tender.ikn, tender, message, sent: [] };
+          const record = { keyword: kw, ikn: tender.ikn, tender, message, sent: [], ai: aiVerdict };
 
           if (wa.isReady() && cfg.recipients?.length) {
             for (const rcpt of cfg.recipients) {
@@ -168,10 +199,11 @@ async function runOnce() {
           storage.addMatch(record);
           emitMatch(record);
         }
-        if (filteredOut > 0 || skippedSeen > 0) {
+        if (filteredOut > 0 || skippedSeen > 0 || aiRejected > 0) {
           const parts = [];
           if (filteredOut > 0) parts.push(`${filteredOut} başlık/blacklist eledi`);
           if (skippedSeen > 0) parts.push(`${skippedSeen} daha önce bildirilmiş`);
+          if (aiRejected > 0) parts.push(`${aiRejected} AI eledi`);
           log('  ' + parts.join(' · '));
         }
       } catch (err) {

@@ -13,6 +13,13 @@ const DEFAULT_CONFIG = {
   searchType: 'TumKelimeler',  // 'GirdigimGibi' (tam ibare) veya 'TumKelimeler' (her kelime ayrı)
   strictTitleMatch: true,  // true: anahtar kelimenin kökü ihale başlığında geçmeli
   blacklist: [],           // başlıkta bu kelimelerden biri geçerse ihaleyi at
+  // Yapay zeka filtre (Google Gemini)
+  aiEnabled: false,
+  aiProvider: 'gemini',
+  aiModel: 'gemini-2.0-flash',
+  aiApiKey: '',
+  aiBusinessContext: 'Elektrik dağıtım şirketleri için SCADA, OG/AG pano, kontrol panosu, trafo, RMU, kesici gibi orta gerilim ve otomasyon ekipmanları üretiyor/kuruyoruz.',
+  aiMinConfidence: 0.5,
   messageTemplate:
     'Yeni ihale bulundu 🔔\n\n' +
     'Anahtar: {keyword}\n' +

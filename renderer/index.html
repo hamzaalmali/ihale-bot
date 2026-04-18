@@ -267,6 +267,48 @@
         </div>
 
         <div class="card wide">
+          <h2 class="card-title">🤖 Yapay Zeka Filtre (Google Gemini · ücretsiz)</h2>
+          <p class="muted small">
+            Kelime filtresinden geçen sonuçları Gemini'ye danışır:
+            "bu ihale gerçekten alakalı mı?" diye sorar. <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+            adresinden ücretsiz API anahtarı alın (kart bilgisi gerekmez, günde 1500 istek hakkı).
+          </p>
+          <div class="grid-3">
+            <label class="field">
+              <span>Durum</span>
+              <select id="aiEnabled">
+                <option value="false">Kapalı</option>
+                <option value="true">Açık</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Model</span>
+              <select id="aiModel">
+                <option value="gemini-2.0-flash">gemini-2.0-flash (önerilen)</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro (daha akıllı, daha düşük kota)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Min. Güven (0-1)</span>
+              <input id="aiMinConfidence" type="number" min="0" max="1" step="0.05" value="0.5" />
+            </label>
+          </div>
+          <label class="field">
+            <span>API Anahtarı</span>
+            <small>cihazınızda saklanır, koda gömülmez</small>
+            <input id="aiApiKey" type="password" placeholder="AIzaSy…" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>İş Tanımı</span>
+            <small>AI'ya bu metni okur ve buna göre alaka karar verir. Ne kadar net olursa o kadar isabetli filtre.</small>
+            <textarea id="aiBusinessContext" rows="4" placeholder="Örn: Elektrik dağıtım için OG/AG pano, SCADA, kontrol panosu, RMU..." class="mono"></textarea>
+          </label>
+          <button id="testAi" class="btn">Bağlantıyı Test Et</button>
+          <div id="aiTestResult" class="muted small" style="margin-top:0.5rem"></div>
+        </div>
+
+        <div class="card wide">
           <h2 class="card-title">Mesaj Şablonu</h2>
           <p class="muted small">
             Değişkenler:
