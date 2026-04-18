@@ -4,6 +4,44 @@
 //   - Groq   : console.groq.com/keys           (14400 RPD, Llama 3.3 70B, çok hızlı)
 
 // ── Ortak yardımcılar ──────────────────────────────────────────────────────
+function buildBatchPrompt({ businessContext, keywords, items }) {
+  const ctx = String(businessContext || '').trim() || 'Genel ihale takibi';
+  const kw = (keywords || []).slice(0, 30).join(', ');
+  return [
+    'Sen bir Türk firmasının kamu ihale filtre uzmanısın. Tutarlı ve titiz ol.',
+    '',
+    '═══ FİRMA PROFİLİ ═══',
+    ctx,
+    '',
+    'İLGİLİ ANAHTAR KELİMELER (yön gösterir, tek başına yeterli değil):',
+    kw,
+    '',
+    '═══ KARAR KURALLARI ═══',
+    '1. Bir başlıkta anahtar kelime geçiyor diye otomatik "alakalı" deme; ihale konusunun firmanın gerçekten yaptığı işle örtüşmesi şart.',
+    '2. Şüpheliyse FALSE tarafına eğil — false negative > false positive.',
+    '3. Aynı tür ihaleyi her seferinde aynı kararla değerlendir.',
+    '',
+    '═══ ÖRNEKLER ═══',
+    '"OG Pano Alımı" → relevant=true (doğrudan iş alanı)',
+    '"SCADA Otomasyon Sistemi" → relevant=true',
+    '"Trafo Bakımı" → relevant=true',
+    '"Belediye Hizmet Binası Yapım İşi" → relevant=false (inşaat)',
+    '"Koruyucu Giyim Donanım Malzemesi" → relevant=false (giyim)',
+    '"Yemek Hizmeti" → relevant=false (catering)',
+    '"Bilgisayar/Yazılım Alımı" → relevant=false (IT)',
+    '"Tavuk/Süt Ürünleri" → relevant=false (gıda)',
+    '"Zemin Kaplama" → relevant=false (yapı)',
+    '',
+    '═══ DEĞERLENDİRİLECEK İHALE LİSTESİ ═══',
+    ...items.map((it) => `[${it.idx}] ${it.title || '(yok)'}  |  İdare: ${it.authority || '-'}  |  Tür: ${it.type || '-'}  |  Şehir: ${it.city || '-'}`),
+    '',
+    '═══ ÇIKTI ═══',
+    'YALNIZCA aşağıdaki ham JSON nesnesini döndür. Açıklama metni veya markdown YOK.',
+    '{ "results": [ { "idx": 0, "relevant": true, "confidence": 0.0..1.0, "reason": "kısa Türkçe gerekçe" }, ... ] }',
+    'Listedeki her ihale için bir sonuç döndürmen şart.',
+  ].join('\n');
+}
+
 function buildPrompt({ tender, businessContext, keywords }) {
   const t = tender || {};
   const ctx = String(businessContext || '').trim() || 'Genel ihale takibi';
@@ -148,6 +186,42 @@ const gemini = {
   async test({ apiKey, model }) {
     return gemini.classify({ ...SAMPLE, apiKey, model });
   },
+
+  async classifyBatch({ tenders, businessContext, keywords, apiKey, model }) {
+    if (!apiKey) throw new Error('Gemini API anahtarı yok');
+    const items = tenders.map((t, i) => ({
+      idx: i,
+      title: t.name || '',
+      authority: t.authority || '',
+      city: t.province || '',
+      type: t.type?.description || '',
+    }));
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model || 'gemini-2.0-flash-lite')}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = {
+      contents: [{ parts: [{ text: buildBatchPrompt({ businessContext, keywords, items }) }] }],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+      },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw tagError(new Error(`Gemini ${res.status}: ${txt.slice(0, 240)}`), res.status);
+    }
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+    const parsed = extractJson(text);
+    if (!parsed || !Array.isArray(parsed.results)) {
+      throw new Error('Gemini batch yanıtı ayrıştırılamadı: ' + text.slice(0, 200));
+    }
+    return parsed.results;
+  },
 };
 
 // ── Groq sağlayıcısı (OpenAI uyumlu) ───────────────────────────────────────
@@ -215,6 +289,46 @@ const groq = {
   async test({ apiKey, model }) {
     return groq.classify({ ...SAMPLE, apiKey, model });
   },
+
+  async classifyBatch({ tenders, businessContext, keywords, apiKey, model }) {
+    if (!apiKey) throw new Error('Groq API anahtarı yok');
+    const items = tenders.map((t, i) => ({
+      idx: i,
+      title: t.name || '',
+      authority: t.authority || '',
+      city: t.province || '',
+      type: t.type?.description || '',
+    }));
+    const body = {
+      model: model || 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'Yalnızca geçerli JSON döndüren bir analistsin. Açıklama yazma, code fence kullanma.' },
+        { role: 'user', content: buildBatchPrompt({ businessContext, keywords, items }) },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0,
+      max_tokens: 4096,
+    };
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw tagError(new Error(`Groq ${res.status}: ${txt.slice(0, 240)}`), res.status);
+    }
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content || '';
+    const parsed = extractJson(text);
+    if (!parsed || !Array.isArray(parsed.results)) {
+      throw new Error('Groq batch yanıtı ayrıştırılamadı: ' + text.slice(0, 200));
+    }
+    return parsed.results;
+  },
 };
 
 const PROVIDERS = { gemini, groq };
@@ -225,6 +339,7 @@ function pick(p) {
 
 module.exports = {
   classifyTender: ({ provider = 'gemini', ...rest }) => pick(provider).classify(rest),
+  classifyBatch: ({ provider = 'gemini', ...rest }) => pick(provider).classifyBatch(rest),
   listModels: ({ provider = 'gemini', apiKey }) => pick(provider).listModels({ apiKey }),
   testConnection: ({ provider = 'gemini', apiKey, model }) => pick(provider).test({ apiKey, model }),
   DEFAULT_MODEL: 'gemini-2.0-flash-lite',

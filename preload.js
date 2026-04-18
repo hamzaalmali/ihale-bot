@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   runOnce: () => ipcRenderer.invoke('monitor:runOnce'),
   getMatches: () => ipcRenderer.invoke('monitor:matches'),
   clearSeen: () => ipcRenderer.invoke('monitor:clearSeen'),
+  clearMatches: () => ipcRenderer.invoke('monitor:clearMatches'),
 
   checkUpdates: () => ipcRenderer.invoke('updater:check'),
   updaterState: () => ipcRenderer.invoke('updater:state'),

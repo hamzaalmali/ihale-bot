@@ -125,6 +125,12 @@ on('clearSeen', 'click', async () => {
 });
 on('refreshMatches', 'click', refreshMatches);
 on('refreshMatches2', 'click', refreshMatches);
+on('clearMatches', 'click', async () => {
+  if (!confirm('Eşleşme geçmişi tamamen silinsin mi? Geri alınamaz.')) return;
+  await api.clearMatches();
+  refreshMatches();
+  logLocal('Eşleşme geçmişi temizlendi');
+});
 on('clearLogs', 'click', () => {
   if (el('logBox')) el('logBox').innerHTML = '';
   if (el('logBoxFull')) el('logBoxFull').innerHTML = '';
@@ -341,10 +347,12 @@ async function refreshMatches() {
   const renderItem = (m, { short }) => {
     const sentOK = (m.sent || []).filter((x) => x.ok).length;
     const sentFail = (m.sent || []).filter((x) => !x.ok).length;
+    const aiPct = m.ai && typeof m.ai.confidence === 'number' ? Math.round(m.ai.confidence * 100) : null;
     const badges = [
       `<span class="badge keyword">${esc(m.keyword)}</span>`,
       m.tender?.type?.description ? `<span class="badge">${esc(m.tender.type.description)}</span>` : '',
       m.tender?.province ? `<span class="badge">${esc(m.tender.province)}</span>` : '',
+      m.ai ? `<span class="badge ok" title="${esc(m.ai.reason || '')}">🤖 %${aiPct ?? '?'}</span>` : '',
       sentOK ? `<span class="badge ok">${sentOK} gönderildi</span>` : '',
       sentFail ? `<span class="badge err">${sentFail} hata</span>` : '',
     ].filter(Boolean).join('');

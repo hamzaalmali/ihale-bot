@@ -78,3 +78,4 @@ exports.addMatch = (match) => {
   if (list.length > 200) list.length = 200;
   writeJson('matches.json', list);
 };
+exports.clearMatches = () => writeJson('matches.json', []);

@@ -71,6 +71,7 @@ ipcMain.handle('monitor:status', () => monitor.getStatus());
 ipcMain.handle('monitor:runOnce', () => monitor.runOnce());
 ipcMain.handle('monitor:matches', () => storage.getMatches());
 ipcMain.handle('monitor:clearSeen', () => storage.clearSeen());
+ipcMain.handle('monitor:clearMatches', () => storage.clearMatches());
 
 ipcMain.handle('ai:test', async (_e, { provider, apiKey, model }) => {
   return ai.testConnection({ provider, apiKey, model });
