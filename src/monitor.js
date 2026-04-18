@@ -151,11 +151,12 @@ async function runOnce() {
           if (cfg.aiEnabled && cfg.aiApiKey && !aiDisabledThisRun) {
             try {
               aiVerdict = await ai.classifyTender({
+                provider: cfg.aiProvider || 'gemini',
                 tender,
                 businessContext: cfg.aiBusinessContext,
                 keywords: cfg.keywords,
                 apiKey: cfg.aiApiKey,
-                model: cfg.aiModel || 'gemini-1.5-flash',
+                model: cfg.aiModel,
               });
               const minConf = typeof cfg.aiMinConfidence === 'number' ? cfg.aiMinConfidence : 0.5;
               if (!aiVerdict.relevant || (aiVerdict.confidence !== null && aiVerdict.confidence < minConf)) {
@@ -180,8 +181,9 @@ async function runOnce() {
                 log(`  🤖 AI hatası, kelime filtresine güveniyoruz: ${err.message}`, 'warn');
               }
             }
-            // Gemini free tier rate limit (15 RPM = ~4sn)
-            if (!aiDisabledThisRun) await new Promise((r) => setTimeout(r, 4500));
+            // Provider rate limit: Gemini 15 RPM (~4.5sn), Groq 30 RPM (~2.2sn)
+            const sleepMs = (cfg.aiProvider === 'groq') ? 2200 : 4500;
+            if (!aiDisabledThisRun) await new Promise((r) => setTimeout(r, sleepMs));
           }
 
           seen.add(dedupeKey);

@@ -72,11 +72,11 @@ ipcMain.handle('monitor:runOnce', () => monitor.runOnce());
 ipcMain.handle('monitor:matches', () => storage.getMatches());
 ipcMain.handle('monitor:clearSeen', () => storage.clearSeen());
 
-ipcMain.handle('ai:test', async (_e, { apiKey, model }) => {
-  return ai.testConnection({ apiKey, model });
+ipcMain.handle('ai:test', async (_e, { provider, apiKey, model }) => {
+  return ai.testConnection({ provider, apiKey, model });
 });
-ipcMain.handle('ai:list-models', async (_e, { apiKey }) => {
-  return ai.listModels({ apiKey });
+ipcMain.handle('ai:list-models', async (_e, { provider, apiKey }) => {
+  return ai.listModels({ provider, apiKey });
 });
 
 ipcMain.handle('updater:check', () => updater.checkForUpdates({ silent: false }));

@@ -15,7 +15,7 @@ const DEFAULT_CONFIG = {
   blacklist: [],           // başlıkta bu kelimelerden biri geçerse ihaleyi at
   // Yapay zeka filtre (Google Gemini)
   aiEnabled: false,
-  aiProvider: 'gemini',
+  aiProvider: 'groq',
   aiModel: '',  // "Modelleri Yükle" ile API'den listelenip seçilecek
   aiApiKey: '',
   aiBusinessContext: 'Elektrik dağıtım şirketleri için SCADA, OG/AG pano, kontrol panosu, trafo, RMU, kesici gibi orta gerilim ve otomasyon ekipmanları üretiyor/kuruyoruz.',

@@ -267,11 +267,11 @@
         </div>
 
         <div class="card wide">
-          <h2 class="card-title">🤖 Yapay Zeka Filtre (Google Gemini · ücretsiz)</h2>
+          <h2 class="card-title">🤖 Yapay Zeka Filtre (ücretsiz)</h2>
           <p class="muted small">
-            Kelime filtresinden geçen sonuçları Gemini'ye danışır:
-            "bu ihale gerçekten alakalı mı?" diye sorar. <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
-            adresinden ücretsiz API anahtarı alın (kart bilgisi gerekmez, günde 1500 istek hakkı).
+            Kelime filtresinden geçen sonuçları AI'ya danışır: "bu ihale gerçekten alakalı mı?" Sağlayıcı seçin, ücretsiz API anahtarı alın.<br>
+            <strong>Gemini</strong> → <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> · 1500 istek/gün, bazı bölgelerde dar kota.<br>
+            <strong>Groq</strong> → <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> · 14.400 istek/gün, Llama 3.3 70B, kart gerektirmez (önerilen).
           </p>
           <div class="grid-3">
             <label class="field">
@@ -282,10 +282,10 @@
               </select>
             </label>
             <label class="field">
-              <span>Model</span>
-              <small>API anahtarı girip "Modelleri Yükle"ye basın</small>
-              <select id="aiModel">
-                <option value="">— önce modelleri yükleyin —</option>
+              <span>Sağlayıcı</span>
+              <select id="aiProvider">
+                <option value="groq">Groq (önerilen)</option>
+                <option value="gemini">Google Gemini</option>
               </select>
             </label>
             <label class="field">
@@ -293,6 +293,13 @@
               <input id="aiMinConfidence" type="number" min="0" max="1" step="0.05" value="0.5" />
             </label>
           </div>
+          <label class="field">
+            <span>Model</span>
+            <small>API anahtarı girip "Modelleri Yükle"ye basın</small>
+            <select id="aiModel">
+              <option value="">— önce modelleri yükleyin —</option>
+            </select>
+          </label>
           <label class="field">
             <span>API Anahtarı</span>
             <small>cihazınızda saklanır, koda gömülmez</small>

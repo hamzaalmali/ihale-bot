@@ -36,6 +36,7 @@ async function loadConfig() {
   if (el('strictTitleMatch')) el('strictTitleMatch').value = String(cfg.strictTitleMatch !== false);
   if (el('blacklist')) el('blacklist').value = (cfg.blacklist || []).join(', ');
   if (el('aiEnabled')) el('aiEnabled').value = String(!!cfg.aiEnabled);
+  if (el('aiProvider')) el('aiProvider').value = cfg.aiProvider || 'groq';
   if (el('aiModel') && cfg.aiModel) ensureModelInDropdown(cfg.aiModel);
   if (el('aiMinConfidence')) el('aiMinConfidence').value = cfg.aiMinConfidence ?? 0.5;
   if (el('aiApiKey')) el('aiApiKey').value = cfg.aiApiKey || '';
@@ -87,7 +88,8 @@ on('saveConfig', 'click', async () => {
     strictTitleMatch: (el('strictTitleMatch')?.value || 'true') === 'true',
     blacklist: splitList(el('blacklist')?.value || ''),
     aiEnabled: (el('aiEnabled')?.value || 'false') === 'true',
-    aiModel: el('aiModel')?.value || 'gemini-2.0-flash',
+    aiProvider: el('aiProvider')?.value || 'groq',
+    aiModel: el('aiModel')?.value || '',
     aiApiKey: (el('aiApiKey')?.value || '').trim(),
     aiBusinessContext: el('aiBusinessContext')?.value || '',
     aiMinConfidence: parseFloat(el('aiMinConfidence')?.value || '0.5') || 0.5,
@@ -145,10 +147,11 @@ function ensureModelInDropdown(modelName) {
 on('loadAiModels', 'click', async () => {
   const out = el('aiTestResult');
   const apiKey = (el('aiApiKey')?.value || '').trim();
+  const provider = el('aiProvider')?.value || 'groq';
   if (!apiKey) { if (out) out.textContent = 'Önce API anahtarını yapıştırın.'; return; }
-  if (out) { out.style.color = ''; out.textContent = 'Modeller yükleniyor…'; }
+  if (out) { out.style.color = ''; out.textContent = `${provider} modelleri yükleniyor…`; }
   try {
-    const models = await api.listAiModels(apiKey);
+    const models = await api.listAiModels(provider, apiKey);
     const sel = el('aiModel');
     const previous = sel.value;
     sel.innerHTML = '';
@@ -188,18 +191,29 @@ on('testAi', 'click', async () => {
   if (!out) return;
   const apiKey = (el('aiApiKey')?.value || '').trim();
   const model = el('aiModel')?.value;
+  const provider = el('aiProvider')?.value || 'groq';
   if (!apiKey) { out.textContent = 'API anahtarı boş.'; return; }
   if (!model) { out.textContent = 'Önce "Modelleri Yükle" ile bir model seçin.'; out.style.color = '#b91c1c'; return; }
-  out.textContent = 'Test ediliyor…';
+  out.textContent = `${provider} · ${model} test ediliyor…`;
   out.style.color = '';
   try {
-    const r = await api.testAi(apiKey, model);
-    out.innerHTML = `✓ Bağlantı OK · ${esc(model)} · örnek karar: <strong>${r.relevant ? 'Alakalı' : 'Alakasız'}</strong> (güven %${Math.round((r.confidence || 0) * 100)}) — <em>${esc(r.reason || '')}</em>`;
+    const r = await api.testAi(provider, apiKey, model);
+    out.innerHTML = `✓ ${esc(provider)} · ${esc(model)} · örnek karar: <strong>${r.relevant ? 'Alakalı' : 'Alakasız'}</strong> (güven %${Math.round((r.confidence || 0) * 100)}) — <em>${esc(r.reason || '')}</em>`;
     out.style.color = r.relevant ? '#047857' : '#b91c1c';
   } catch (err) {
     out.textContent = '✘ ' + err.message;
     out.style.color = '#b91c1c';
   }
+});
+
+// Sağlayıcı değişince modelleri sıfırla — Gemini ve Groq farklı modeller listeler
+on('aiProvider', 'change', () => {
+  const sel = el('aiModel');
+  if (sel) {
+    sel.innerHTML = '<option value="">— "Modelleri Yükle"ye basın —</option>';
+  }
+  const out = el('aiTestResult');
+  if (out) { out.textContent = ''; out.style.color = ''; }
 });
 
 // ── Grup seçici ─────────────────────────────────────────────────────────────
