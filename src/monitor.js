@@ -96,6 +96,15 @@ async function runOnce() {
 
     log(`Tarama başladı — ${cfg.keywords.length} anahtar · ${startDate}…${endDate}`);
 
+    // AI durumunu görünür kıl
+    if (cfg.aiEnabled && cfg.aiApiKey) {
+      log(`🤖 AI filtre aktif: ${cfg.aiProvider || 'gemini'} · ${cfg.aiModel || '(model seçilmedi)'} · min güven ${cfg.aiMinConfidence ?? 0.5}`);
+    } else if (cfg.aiEnabled && !cfg.aiApiKey) {
+      log(`⚠ AI açık ama API anahtarı boş — kelime filtresine düşüldü`, 'warn');
+    } else {
+      log(`AI filtre KAPALI (sadece kelime/blacklist filtresi)`);
+    }
+
     let aiDisabledThisRun = false; // 429/403 alırsak bu tarama içinde AI'yı kapat
 
     for (const kw of cfg.keywords) {
