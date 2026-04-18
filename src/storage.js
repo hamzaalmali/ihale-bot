@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   // Yapay zeka filtre (Google Gemini)
   aiEnabled: false,
   aiProvider: 'gemini',
-  aiModel: 'gemini-2.0-flash',
+  aiModel: 'gemini-1.5-flash',
   aiApiKey: '',
   aiBusinessContext: 'Elektrik dağıtım şirketleri için SCADA, OG/AG pano, kontrol panosu, trafo, RMU, kesici gibi orta gerilim ve otomasyon ekipmanları üretiyor/kuruyoruz.',
   aiMinConfidence: 0.5,

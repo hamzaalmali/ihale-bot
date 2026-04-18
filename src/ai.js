@@ -21,27 +21,47 @@ function buildPrompt({ tender, businessContext, keywords }) {
   const kw = (keywords || []).slice(0, 30).join(', ');
 
   return [
-    'Sen, bir Türk firmasının kamu ihalelerini filtreleyen yardımcısın.',
+    'GÖREV: Bir Türk şirketinin kamu ihalelerini filtreleyen titiz bir analistsin.',
+    'Karar verirken: ihale başlığı + idare + tür birleşimine bütünsel bak. Tutarlı ol — aynı tür ihaleye her seferinde aynı kararı ver. Tahmin değil, kanıta dayalı karar.',
     '',
-    'FİRMA İŞ ALANI:',
+    '═══ FİRMA PROFİLİ ═══',
     ctx,
     '',
-    `İLGİLİ ANAHTAR KELİMELER: ${kw || '(verilmedi)'}`,
+    `İLGİLİ ANAHTAR KELİMELER (sektörü çağrıştırır, ama tek başına yeterli değildir):`,
+    kw || '(belirtilmedi)',
     '',
-    'İHALE BİLGİSİ:',
-    `- Başlık: ${t.name || '(yok)'}`,
-    `- İdare: ${t.authority || '(yok)'}`,
-    `- Tür: ${t.type?.description || '(yok)'}`,
-    `- Şehir: ${t.province || '(yok)'}`,
+    '═══ DEĞERLENDİRİLECEK İHALE ═══',
+    `Başlık : ${t.name || '(yok)'}`,
+    `İdare  : ${t.authority || '(yok)'}`,
+    `Şehir  : ${t.province || '(yok)'}`,
+    `Tür    : ${t.type?.description || '(yok)'}`,
+    `IKN    : ${t.ikn || '(yok)'}`,
     '',
-    'GÖREV:',
-    'Bu ihale, firmanın iş alanına gerçekten uygun mu? Sadece başlığa bak, anahtar kelimelerin tesadüfen geçmesi yetmez.',
-    'Örnekler:',
-    '- "Belediye giyim alımı" → SCADA/elektrik dağıtım firmasıyla alakasız → false',
-    '- "OG pano alımı" → elektrik dağıtım firmasıyla alakalı → true',
-    '- "Güneş enerjisi santrali tedariki" → elektrik şirketleri ilgili olabilir, kullanıcının iş tanımı kapsamındaysa true',
+    '═══ KARAR KURALLARI ═══',
+    '1. Başlıkta bir anahtar kelime geçiyor diye otomatik "alakalı" deme. Kontekst kritik.',
+    '2. İhalenin ana konusunun firmanın iş alanına denk gelmesi gerekir. "Yan ürün/aksesuar" ihaleleri reddet.',
+    '3. Şüpheliyse "false" tarafına eğil (false negative > false positive). Kullanıcı bant genişliğini boşa harcamak istemez.',
+    '4. Aynı kavramı her seferinde aynı şekilde değerlendir — kararlarında tutarlı ol.',
     '',
-    'JSON formatında cevap ver: { "relevant": true/false, "confidence": 0..1, "reason": "kısa Türkçe açıklama" }',
+    '═══ ÖRNEKLER (Elektrik dağıtım/SCADA firması için) ═══',
+    'BAŞLIK → KARAR | SEBEP',
+    '"OG Pano Alımı" → TRUE | doğrudan iş alanı',
+    '"Modüler Hücre Tedariki" → TRUE | OG/AG ekipman',
+    '"SCADA Otomasyon Sistemi" → TRUE | doğrudan iş alanı',
+    '"Trafo Bakımı ve Yenileme" → TRUE | trafo işi',
+    '"Belediye Hizmet Binası Yapım İşi" → FALSE | inşaat işi, alakasız',
+    '"Koruyucu Giyim ve Donanım Malzemesi Alımı" → FALSE | giyim, alakasız',
+    '"İnşaat Malzemesi Alım İşi" → FALSE | inşaat, alakasız',
+    '"Zemin Kaplama Döşemesi" → FALSE | yapı işi',
+    '"Personel Çalıştırılmasına Dayalı Hizmet Alımı" → FALSE | hizmet/personel',
+    '"Güneş Enerjisi Santrali (GES) Projesi Tasarımı" → TRUE | enerji altyapı, scada/pano içerebilir',
+    '"Yemek Hizmeti Alımı" → FALSE | catering',
+    '"Bilgisayar/Yazılım Alımı" → FALSE | IT, alakasız',
+    '"Tavuk/Süt Ürünleri Alımı" → FALSE | gıda',
+    '',
+    '═══ ÇIKTI ═══',
+    'Sadece JSON: { "relevant": boolean, "confidence": 0..1, "reason": "kısa Türkçe gerekçe" }',
+    'reason 1-2 cümle olsun, neden alakalı/alakasız olduğunu somut belirt.',
   ].join('\n');
 }
 
@@ -65,7 +85,12 @@ async function classifyTender({ tender, businessContext, keywords, apiKey, model
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`Gemini ${res.status}: ${txt.slice(0, 240)}`);
+    const err = new Error(`Gemini ${res.status}: ${txt.slice(0, 240)}`);
+    err.status = res.status;
+    if (res.status === 429) err.code = 'RATE_LIMIT';
+    if (res.status === 403) err.code = 'AUTH';
+    if (res.status === 404) err.code = 'MODEL_NOT_FOUND';
+    throw err;
   }
   const data = await res.json();
   const text =

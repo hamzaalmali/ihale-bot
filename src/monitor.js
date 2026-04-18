@@ -96,6 +96,8 @@ async function runOnce() {
 
     log(`Tarama başladı — ${cfg.keywords.length} anahtar · ${startDate}…${endDate}`);
 
+    let aiDisabledThisRun = false; // 429/403 alırsak bu tarama içinde AI'yı kapat
+
     for (const kw of cfg.keywords) {
       try {
         log(`🔍 "${kw}"`);
@@ -146,30 +148,40 @@ async function runOnce() {
 
           // ── Yapay zeka ön-filtre (Google Gemini) ──
           let aiVerdict = null;
-          if (cfg.aiEnabled && cfg.aiApiKey) {
+          if (cfg.aiEnabled && cfg.aiApiKey && !aiDisabledThisRun) {
             try {
               aiVerdict = await ai.classifyTender({
                 tender,
                 businessContext: cfg.aiBusinessContext,
                 keywords: cfg.keywords,
                 apiKey: cfg.aiApiKey,
-                model: cfg.aiModel || 'gemini-2.0-flash',
+                model: cfg.aiModel || 'gemini-1.5-flash',
               });
               const minConf = typeof cfg.aiMinConfidence === 'number' ? cfg.aiMinConfidence : 0.5;
               if (!aiVerdict.relevant || (aiVerdict.confidence !== null && aiVerdict.confidence < minConf)) {
                 aiRejected++;
                 log(`  🤖 atladı: ${tender.name?.slice(0, 70)} — ${aiVerdict.reason}`);
-                // dedupe'a yine de ekle ki tekrar AI'ya sormayalım
                 seen.add(dedupeKey);
                 newIkns.push(dedupeKey);
                 continue;
               }
               log(`  🤖 onayladı: ${tender.name?.slice(0, 70)} (güven %${Math.round((aiVerdict.confidence || 0) * 100)})`);
             } catch (err) {
-              log(`  🤖 AI hatası, kelime filtresine göre devam: ${err.message}`, 'warn');
+              if (err.code === 'RATE_LIMIT') {
+                aiDisabledThisRun = true;
+                log(`  🤖 Gemini kotası doldu — bu tarama AI olmadan devam ediyor (kelime filtresine göre)`, 'warn');
+              } else if (err.code === 'AUTH') {
+                aiDisabledThisRun = true;
+                log(`  🤖 Gemini API anahtarı geçersiz — AI devre dışı bırakıldı`, 'error');
+              } else if (err.code === 'MODEL_NOT_FOUND') {
+                aiDisabledThisRun = true;
+                log(`  🤖 Model bulunamadı (${cfg.aiModel}) — Ayarlar'dan farklı model seçin`, 'error');
+              } else {
+                log(`  🤖 AI hatası, kelime filtresine güveniyoruz: ${err.message}`, 'warn');
+              }
             }
             // Gemini free tier rate limit (15 RPM = ~4sn)
-            await new Promise((r) => setTimeout(r, 4500));
+            if (!aiDisabledThisRun) await new Promise((r) => setTimeout(r, 4500));
           }
 
           seen.add(dedupeKey);
