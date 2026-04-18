@@ -60,9 +60,27 @@ function buildPrompt({ tender, businessContext, keywords }) {
     '"Tavuk/Süt Ürünleri Alımı" → FALSE | gıda',
     '',
     '═══ ÇIKTI ═══',
-    'Sadece JSON: { "relevant": boolean, "confidence": 0..1, "reason": "kısa Türkçe gerekçe" }',
+    'YALNIZCA aşağıdaki şemada ham JSON döndür. Açıklama metni, "Here is...", markdown code fence (```), satır öncesi/sonrası boşluk YOK.',
+    '{ "relevant": boolean, "confidence": 0..1, "reason": "kısa Türkçe gerekçe" }',
     'reason 1-2 cümle olsun, neden alakalı/alakasız olduğunu somut belirt.',
   ].join('\n');
+}
+
+// Markdown code fence, "Here is the JSON" gibi prefix/suffix'leri temizleyip
+// metinden ilk JSON nesnesini çıkarır. Gemini 2.5 modelleri çoğu zaman
+// responseMimeType=application/json'a rağmen ham JSON dönmez.
+function extractJson(text) {
+  if (!text) return null;
+  let s = String(text).trim();
+  // ```json ... ``` veya ``` ... ``` bloklarını soy
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  // İlk { ... son } arasını al
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  const slice = s.slice(start, end + 1);
+  try { return JSON.parse(slice); } catch (_) { return null; }
 }
 
 async function classifyTender({ tender, businessContext, keywords, apiKey, model }) {
@@ -97,9 +115,9 @@ async function classifyTender({ tender, businessContext, keywords, apiKey, model
     data?.candidates?.[0]?.content?.parts?.[0]?.text ||
     data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ||
     '';
-  let parsed;
-  try { parsed = JSON.parse(text); } catch (_) {
-    throw new Error('Gemini yanıtı JSON olarak ayrıştırılamadı: ' + text.slice(0, 160));
+  const parsed = extractJson(text);
+  if (!parsed) {
+    throw new Error('Gemini yanıtı JSON olarak ayrıştırılamadı: ' + text.slice(0, 200));
   }
   return {
     relevant: !!parsed.relevant,
