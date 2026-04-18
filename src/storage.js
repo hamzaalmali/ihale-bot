@@ -69,7 +69,10 @@ exports.addSeen = (ids) => {
   ids.forEach((i) => current.add(i));
   writeJson('seen.json', Array.from(current).slice(-5000));
 };
-exports.clearSeen = () => writeJson('seen.json', []);
+exports.clearSeen = () => {
+  writeJson('seen.json', []);
+  writeJson('lastScan.json', { at: null });
+};
 
 exports.getMatches = () => readJson('matches.json', []);
 exports.addMatch = (match) => {
@@ -97,3 +100,11 @@ exports.addScanned = (records) => {
   writeJson('scanned.json', merged);
 };
 exports.clearScanned = () => writeJson('scanned.json', []);
+
+// Incremental scan zaman damgası — her başarılı tarama sonunda kaydedilir
+exports.getLastScanAt = () => {
+  const v = readJson('lastScan.json', null);
+  return v?.at || null;
+};
+exports.setLastScanAt = (iso) => writeJson('lastScan.json', { at: iso });
+exports.clearLastScanAt = () => writeJson('lastScan.json', { at: null });

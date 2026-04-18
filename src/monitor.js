@@ -83,14 +83,33 @@ async function runOnce() {
     const cfg = storage.getConfig();
 
     const today = new Date();
-    const from = new Date(today.getTime() - (cfg.lookbackDays || 3) * 86400000);
+    const lastScanISO = storage.getLastScanAt();
+    const lastScan = lastScanISO ? new Date(lastScanISO) : null;
+
+    // Incremental window: ilk tarama lookbackDays kadar geri,
+    // sonraki taramalar (geçen süre + 24 saat buffer) ama en fazla lookbackDays
+    const maxLookbackMs = (cfg.lookbackDays || 7) * 86400000;
+    let windowMs;
+    let windowReason;
+    if (!lastScan) {
+      windowMs = maxLookbackMs;
+      windowReason = `ilk tarama, son ${cfg.lookbackDays || 7} gün`;
+    } else {
+      const elapsedMs = today.getTime() - lastScan.getTime();
+      const bufferMs = 24 * 3600000; // 24 saat güvenlik payı
+      windowMs = Math.min(elapsedMs + bufferMs, maxLookbackMs);
+      const hours = Math.round(windowMs / 3600000);
+      windowReason = `son tarama: ${lastScan.toLocaleString('tr-TR')} → bu pencere ${hours} saat`;
+    }
+
+    const from = new Date(today.getTime() - windowMs);
     const startDate = ymd(from);
     const endDate = ymd(today);
 
     const seen = new Set(storage.getSeen());
     const newIkns = [];
 
-    log(`Tarama başladı — son ${cfg.lookbackDays || 7} gün (${startDate} → ${endDate})`);
+    log(`Tarama başladı — ${windowReason} (${startDate} → ${endDate})`);
 
     // AI durumunu görünür kıl
     if (cfg.aiEnabled && cfg.aiApiKey) {
@@ -285,6 +304,7 @@ async function runOnce() {
     }
 
     if (newIkns.length) storage.addSeen(newIkns);
+    storage.setLastScanAt(new Date().toISOString());
     state.lastRun = new Date().toISOString();
     state.error = null;
     log(`✅ Tarama bitti — ${approved.length} WhatsApp mesajı, ${aiRejected} AI eledi, ${blacklisted} blacklist eledi, ${skippedSeen} eski`);
