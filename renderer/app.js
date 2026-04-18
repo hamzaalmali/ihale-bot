@@ -35,6 +35,11 @@ async function loadConfig() {
   if (el('searchType')) el('searchType').value = cfg.searchType || 'TumKelimeler';
   if (el('strictTitleMatch')) el('strictTitleMatch').value = String(cfg.strictTitleMatch !== false);
   if (el('blacklist')) el('blacklist').value = (cfg.blacklist || []).join(', ');
+  if (el('aiEnabled')) el('aiEnabled').value = String(!!cfg.aiEnabled);
+  if (el('aiModel')) el('aiModel').value = cfg.aiModel || 'gemini-2.0-flash';
+  if (el('aiMinConfidence')) el('aiMinConfidence').value = cfg.aiMinConfidence ?? 0.5;
+  if (el('aiApiKey')) el('aiApiKey').value = cfg.aiApiKey || '';
+  if (el('aiBusinessContext')) el('aiBusinessContext').value = cfg.aiBusinessContext || '';
   el('template').value = cfg.messageTemplate || '';
 
   el('statKeywords').textContent = (cfg.keywords || []).length || '0';
@@ -81,6 +86,11 @@ on('saveConfig', 'click', async () => {
     searchType: el('searchType')?.value || 'TumKelimeler',
     strictTitleMatch: (el('strictTitleMatch')?.value || 'true') === 'true',
     blacklist: splitList(el('blacklist')?.value || ''),
+    aiEnabled: (el('aiEnabled')?.value || 'false') === 'true',
+    aiModel: el('aiModel')?.value || 'gemini-2.0-flash',
+    aiApiKey: (el('aiApiKey')?.value || '').trim(),
+    aiBusinessContext: el('aiBusinessContext')?.value || '',
+    aiMinConfidence: parseFloat(el('aiMinConfidence')?.value || '0.5') || 0.5,
     messageTemplate: el('template').value,
   };
   await api.setConfig(cfg);
@@ -119,6 +129,23 @@ on('clearLogs', 'click', () => {
   if (el('logCount')) el('logCount').textContent = '0 satır';
 });
 on('matchFilter', 'input', refreshMatches);
+
+on('testAi', 'click', async () => {
+  const out = el('aiTestResult');
+  if (!out) return;
+  const apiKey = (el('aiApiKey')?.value || '').trim();
+  const model = el('aiModel')?.value || 'gemini-2.0-flash';
+  if (!apiKey) { out.textContent = 'API anahtarı boş.'; return; }
+  out.textContent = 'Test ediliyor…';
+  try {
+    const r = await api.testAi(apiKey, model);
+    out.innerHTML = `✓ Bağlantı OK · örnek karar: <strong>${r.relevant ? 'Alakalı' : 'Alakasız'}</strong> (güven %${Math.round((r.confidence || 0) * 100)}) — <em>${esc(r.reason || '')}</em>`;
+    out.style.color = r.relevant ? '#047857' : '#b91c1c';
+  } catch (err) {
+    out.textContent = '✘ ' + err.message;
+    out.style.color = '#b91c1c';
+  }
+});
 
 // ── Grup seçici ─────────────────────────────────────────────────────────────
 on('loadGroups', 'click', async () => {
