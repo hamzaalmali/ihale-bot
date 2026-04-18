@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   testWhatsApp: (number, text) => ipcRenderer.invoke('wa:test', number, text),
   listGroups: () => ipcRenderer.invoke('wa:groups'),
   testAi: (apiKey, model) => ipcRenderer.invoke('ai:test', { apiKey, model }),
+  listAiModels: (apiKey) => ipcRenderer.invoke('ai:list-models', { apiKey }),
 
   startMonitor: () => ipcRenderer.invoke('monitor:start'),
   stopMonitor: () => ipcRenderer.invoke('monitor:stop'),

@@ -108,6 +108,37 @@ async function classifyTender({ tender, businessContext, keywords, apiKey, model
   };
 }
 
+async function listModels({ apiKey }) {
+  if (!apiKey) throw new Error('API anahtarı gerekli');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    const err = new Error(`Model listesi alınamadı (${res.status}): ${txt.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  const all = Array.isArray(data.models) ? data.models : [];
+  return all
+    .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+    .map((m) => ({
+      name: String(m.name || '').replace(/^models\//, ''),
+      displayName: m.displayName || m.name,
+      description: m.description || '',
+      inputTokenLimit: m.inputTokenLimit,
+      outputTokenLimit: m.outputTokenLimit,
+    }))
+    .filter((m) => /^gemini-/i.test(m.name) && !/embedding|aqa|imagen|veo/i.test(m.name))
+    .sort((a, b) => {
+      // Önce flash-lite/flash, sonra pro; içinde versiyon büyükten küçüğe
+      const score = (n) =>
+        (/flash-lite/i.test(n) ? 1 : /flash/i.test(n) ? 2 : 3) * 100 -
+        parseFloat((n.match(/(\d+\.\d+)/) || [0, 0])[1] || 0);
+      return score(a.name) - score(b.name);
+    });
+}
+
 async function testConnection({ apiKey, model }) {
   return classifyTender({
     tender: { name: 'OG Pano Alımı', authority: 'Test Belediyesi', province: 'ANKARA', type: { description: 'Mal' } },
@@ -118,4 +149,4 @@ async function testConnection({ apiKey, model }) {
   });
 }
 
-module.exports = { classifyTender, testConnection, DEFAULT_MODEL };
+module.exports = { classifyTender, testConnection, listModels, DEFAULT_MODEL };

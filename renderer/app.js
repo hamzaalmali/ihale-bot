@@ -36,7 +36,7 @@ async function loadConfig() {
   if (el('strictTitleMatch')) el('strictTitleMatch').value = String(cfg.strictTitleMatch !== false);
   if (el('blacklist')) el('blacklist').value = (cfg.blacklist || []).join(', ');
   if (el('aiEnabled')) el('aiEnabled').value = String(!!cfg.aiEnabled);
-  if (el('aiModel')) el('aiModel').value = cfg.aiModel || 'gemini-2.0-flash';
+  if (el('aiModel') && cfg.aiModel) ensureModelInDropdown(cfg.aiModel);
   if (el('aiMinConfidence')) el('aiMinConfidence').value = cfg.aiMinConfidence ?? 0.5;
   if (el('aiApiKey')) el('aiApiKey').value = cfg.aiApiKey || '';
   if (el('aiBusinessContext')) el('aiBusinessContext').value = cfg.aiBusinessContext || '';
@@ -130,16 +130,71 @@ on('clearLogs', 'click', () => {
 });
 on('matchFilter', 'input', refreshMatches);
 
+function ensureModelInDropdown(modelName) {
+  if (!modelName) return;
+  const sel = el('aiModel');
+  if (!sel) return;
+  for (const o of sel.options) if (o.value === modelName) return;
+  const opt = document.createElement('option');
+  opt.value = modelName;
+  opt.textContent = modelName + ' (kayıtlı)';
+  sel.appendChild(opt);
+  sel.value = modelName;
+}
+
+on('loadAiModels', 'click', async () => {
+  const out = el('aiTestResult');
+  const apiKey = (el('aiApiKey')?.value || '').trim();
+  if (!apiKey) { if (out) out.textContent = 'Önce API anahtarını yapıştırın.'; return; }
+  if (out) { out.style.color = ''; out.textContent = 'Modeller yükleniyor…'; }
+  try {
+    const models = await api.listAiModels(apiKey);
+    const sel = el('aiModel');
+    const previous = sel.value;
+    sel.innerHTML = '';
+    if (!models.length) {
+      sel.innerHTML = '<option value="">— bu hesapta uyumlu model yok —</option>';
+      if (out) { out.textContent = 'Hesapta generateContent destekleyen model bulunamadı.'; out.style.color = '#b91c1c'; }
+      return;
+    }
+    for (const m of models) {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      const lim = m.inputTokenLimit ? ` · ${(m.inputTokenLimit / 1000).toFixed(0)}K` : '';
+      opt.textContent = `${m.name} — ${m.displayName}${lim}`;
+      sel.appendChild(opt);
+    }
+    // Önceki seçimi koru, yoksa flash önceliği
+    if (previous && [...sel.options].some(o => o.value === previous)) {
+      sel.value = previous;
+    } else {
+      const prefer = models.find(m => /flash$/i.test(m.name)) || models[0];
+      sel.value = prefer.name;
+    }
+    if (out) {
+      out.style.color = '#047857';
+      out.textContent = `✓ ${models.length} model yüklendi. Seçili: ${sel.value}. "Bağlantıyı Test Et" ile doğrulayın.`;
+    }
+  } catch (err) {
+    if (out) {
+      out.style.color = '#b91c1c';
+      out.textContent = '✘ ' + err.message;
+    }
+  }
+});
+
 on('testAi', 'click', async () => {
   const out = el('aiTestResult');
   if (!out) return;
   const apiKey = (el('aiApiKey')?.value || '').trim();
-  const model = el('aiModel')?.value || 'gemini-2.0-flash';
+  const model = el('aiModel')?.value;
   if (!apiKey) { out.textContent = 'API anahtarı boş.'; return; }
+  if (!model) { out.textContent = 'Önce "Modelleri Yükle" ile bir model seçin.'; out.style.color = '#b91c1c'; return; }
   out.textContent = 'Test ediliyor…';
+  out.style.color = '';
   try {
     const r = await api.testAi(apiKey, model);
-    out.innerHTML = `✓ Bağlantı OK · örnek karar: <strong>${r.relevant ? 'Alakalı' : 'Alakasız'}</strong> (güven %${Math.round((r.confidence || 0) * 100)}) — <em>${esc(r.reason || '')}</em>`;
+    out.innerHTML = `✓ Bağlantı OK · ${esc(model)} · örnek karar: <strong>${r.relevant ? 'Alakalı' : 'Alakasız'}</strong> (güven %${Math.round((r.confidence || 0) * 100)}) — <em>${esc(r.reason || '')}</em>`;
     out.style.color = r.relevant ? '#047857' : '#b91c1c';
   } catch (err) {
     out.textContent = '✘ ' + err.message;

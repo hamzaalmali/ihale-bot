@@ -283,12 +283,9 @@
             </label>
             <label class="field">
               <span>Model</span>
+              <small>API anahtarı girip "Modelleri Yükle"ye basın</small>
               <select id="aiModel">
-                <option value="gemini-1.5-flash">gemini-1.5-flash (önerilen, kararlı)</option>
-                <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b (en cömert kota)</option>
-                <option value="gemini-2.0-flash">gemini-2.0-flash (yeni; bazı bölgelerde kotası dar)</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash (en yeni)</option>
-                <option value="gemini-1.5-pro">gemini-1.5-pro (daha akıllı, dar kota)</option>
+                <option value="">— önce modelleri yükleyin —</option>
               </select>
             </label>
             <label class="field">
@@ -306,7 +303,10 @@
             <small>AI'ya bu metni okur ve buna göre alaka karar verir. Ne kadar net olursa o kadar isabetli filtre.</small>
             <textarea id="aiBusinessContext" rows="4" placeholder="Örn: Elektrik dağıtım için OG/AG pano, SCADA, kontrol panosu, RMU..." class="mono"></textarea>
           </label>
-          <button id="testAi" class="btn">Bağlantıyı Test Et</button>
+          <div class="actions">
+            <button id="loadAiModels" class="btn">Modelleri Yükle</button>
+            <button id="testAi" class="btn">Bağlantıyı Test Et</button>
+          </div>
           <div id="aiTestResult" class="muted small" style="margin-top:0.5rem"></div>
         </div>
 

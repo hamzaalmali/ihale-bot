@@ -75,6 +75,9 @@ ipcMain.handle('monitor:clearSeen', () => storage.clearSeen());
 ipcMain.handle('ai:test', async (_e, { apiKey, model }) => {
   return ai.testConnection({ apiKey, model });
 });
+ipcMain.handle('ai:list-models', async (_e, { apiKey }) => {
+  return ai.listModels({ apiKey });
+});
 
 ipcMain.handle('updater:check', () => updater.checkForUpdates({ silent: false }));
 ipcMain.handle('updater:state', () => updater.getState());
