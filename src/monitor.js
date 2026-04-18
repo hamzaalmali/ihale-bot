@@ -81,10 +81,6 @@ async function runOnce() {
   inFlight = true;
   try {
     const cfg = storage.getConfig();
-    if (!cfg.keywords?.length) {
-      log('Anahtar kelime tanımlı değil', 'warn');
-      return;
-    }
 
     const today = new Date();
     const from = new Date(today.getTime() - (cfg.lookbackDays || 3) * 86400000);
@@ -94,67 +90,73 @@ async function runOnce() {
     const seen = new Set(storage.getSeen());
     const newIkns = [];
 
-    log(`Tarama başladı — ${cfg.keywords.length} anahtar · ${startDate}…${endDate}`);
+    log(`Tarama başladı — son ${cfg.lookbackDays || 7} gün (${startDate} → ${endDate})`);
 
     // AI durumunu görünür kıl
     if (cfg.aiEnabled && cfg.aiApiKey) {
       log(`🤖 AI filtre aktif: ${cfg.aiProvider || 'gemini'} · ${cfg.aiModel || '(model seçilmedi)'} · min güven ${cfg.aiMinConfidence ?? 0.5}`);
     } else if (cfg.aiEnabled && !cfg.aiApiKey) {
-      log(`⚠ AI açık ama API anahtarı boş — kelime filtresine düşüldü`, 'warn');
+      log(`⚠ AI açık ama API anahtarı boş`, 'warn');
     } else {
-      log(`AI filtre KAPALI (sadece kelime/blacklist filtresi)`);
+      log(`⚠ AI filtre KAPALI — eşleşmeler için AI tavsiye edilir`, 'warn');
     }
 
-    // 1) Candidate toplama (kelime + blacklist + dedupe filtreleri)
-    const candidates = []; // { tender, kw, dedupeKey }
+    // 1) EKAP'tan TÜM açık ihaleleri pagination ile çek
+    const candidates = []; // { tender, dedupeKey }
     let totalFromEkap = 0;
-    let filteredOut = 0;
+    let blacklisted = 0;
     let skippedSeen = 0;
 
-    for (const kw of cfg.keywords) {
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 50; // emniyet
+    log(`📥 EKAP'tan ihaleler çekiliyor…`);
+
+    for (let page = 0; page < MAX_PAGES; page++) {
+      let result;
       try {
-        log(`🔍 "${kw}"`);
-        const result = await api.searchTenders({
-          searchText: kw,
+        result = await api.searchTenders({
+          searchText: '', // TÜM ihaleler
           announcementDateStart: startDate,
           announcementDateEnd: endDate,
           orderBy: 'ihaleTarihi',
           sortOrder: 'desc',
-          searchType: cfg.searchType || 'TumKelimeler',
-          limit: cfg.perKeywordLimit || 30,
+          searchType: 'TumKelimeler',
           tenderTypes: cfg.tenderTypes?.length ? cfg.tenderTypes : null,
           provinces: cfg.provincePlates?.length ? cfg.provincePlates : null,
+          skip: page * PAGE_SIZE,
+          limit: PAGE_SIZE,
         });
-        if (result.error) {
-          log(`  "${kw}" hatası: ${result.error} — ${result.message || ''}`, 'error');
-          continue;
-        }
-        const tenders = result.tenders || [];
-        totalFromEkap += tenders.length;
-        log(`  ${tenders.length} sonuç (EKAP toplam: ${result.total_count ?? '?'})`);
-
-        for (const tender of tenders) {
-          if (cfg.strictTitleMatch !== false && !matchesKeywordInTitle(tender, kw)) {
-            filteredOut++; continue;
-          }
-          if (hitsBlacklist(tender, cfg.blacklist)) {
-            filteredOut++; continue;
-          }
-          const dedupeKey = tender.ikn
-            || _norm(tender.name || '').slice(0, 160)
-            || String(tender.id || '');
-          if (!dedupeKey) { filteredOut++; continue; }
-          if (seen.has(dedupeKey)) { skippedSeen++; continue; }
-          // İlk gören anahtarın geçtiği versiyonu sakla; aynı dedupeKey tekrar eklenmesin
-          if (candidates.find((c) => c.dedupeKey === dedupeKey)) continue;
-          candidates.push({ tender, kw, dedupeKey });
-        }
       } catch (err) {
-        log(`  "${kw}" hatası: ${err.message}`, 'error');
+        log(`EKAP sayfa ${page + 1} hatası: ${err.message}`, 'error');
+        break;
       }
+      if (result.error) {
+        log(`EKAP sayfa ${page + 1} hatası: ${result.error}`, 'error');
+        break;
+      }
+      const tenders = result.tenders || [];
+      totalFromEkap += tenders.length;
+      const total = result.total_count || 0;
+      log(`  sayfa ${page + 1}: ${tenders.length} ihale (toplam ${total})`);
+
+      for (const tender of tenders) {
+        if (hitsBlacklist(tender, cfg.blacklist)) { blacklisted++; continue; }
+        const dedupeKey = tender.ikn
+          || _norm(tender.name || '').slice(0, 160)
+          || String(tender.id || '');
+        if (!dedupeKey) continue;
+        if (seen.has(dedupeKey)) { skippedSeen++; continue; }
+        if (candidates.find((c) => c.dedupeKey === dedupeKey)) continue;
+        candidates.push({ tender, dedupeKey });
+      }
+
+      if (tenders.length < PAGE_SIZE) break; // son sayfa
+      if (page * PAGE_SIZE + tenders.length >= total) break;
+      // EKAP rate limit dostu — sayfalar arası kısa bekleme
+      await new Promise((r) => setTimeout(r, 400));
     }
 
-    log(`Aday: ${candidates.length} ihale (EKAP: ${totalFromEkap}, kelime/blacklist eledi: ${filteredOut}, daha önce: ${skippedSeen})`);
+    log(`Aday: ${candidates.length} yeni ihale (EKAP'tan toplam: ${totalFromEkap}, blacklist eledi: ${blacklisted}, daha önce: ${skippedSeen})`);
 
     // 2) AI batch sınıflandırma (varsa)
     let approved = candidates;
@@ -215,36 +217,43 @@ async function runOnce() {
         const c = candidates[i];
         const v = verdicts[i];
         if (!v) {
-          // AI bu adayı değerlendirmedi (kotada düştü vs); kelime filtresine güven, gönder
-          if (cfg.aiEnabled && !v) aiSkipped++;
+          // AI bu adayı değerlendirmedi (kota/hata); approved'a EKLEME — sadece scanned olarak kaydet
+          if (cfg.aiEnabled) aiSkipped++;
           c.ai = null;
-          approved.push(c);
           continue;
         }
         const conf = typeof v.confidence === 'number' ? v.confidence : 1;
+        c.ai = v;
         if (v.relevant && conf >= minConf) {
-          c.ai = v;
           approved.push(c);
           log(`  ✓ ${c.tender.name?.slice(0, 80)} (güven %${Math.round(conf * 100)})`);
         } else {
           aiRejected++;
           log(`  ✗ ${c.tender.name?.slice(0, 80)} — ${v.reason || 'alakasız'}`);
-          // Reddedilenler: seen'e ekle, tekrar değerlendirilmesin
-          seen.add(c.dedupeKey);
-          newIkns.push(c.dedupeKey);
         }
       }
       log(`🤖 AI sonucu: ${approved.length} onay · ${aiRejected} red · ${aiSkipped} değerlendirilemedi`);
     }
 
-    // 3) WhatsApp'a gönderim
+    // 3) Tüm aday ihaleleri scanned.json'a kaydet (Taranan İhaleler sekmesi)
+    const scannedRecords = candidates.map((c) => ({
+      ikn: c.tender.ikn,
+      dedupeKey: c.dedupeKey,
+      tender: c.tender,
+      ai: c.ai || null,
+      relevant: c.ai ? !!c.ai.relevant : null,
+      scannedAt: new Date().toISOString(),
+    }));
+    storage.addScanned(scannedRecords);
+
+    // 4) WhatsApp'a gönderim (sadece AI onaylananlar)
     log(`📤 Gönderim aşaması: ${approved.length} ihale, ${cfg.recipients?.length || 0} alıcı`);
     for (const c of approved) {
-      const { tender, kw, dedupeKey, ai: aiVerdict } = c;
+      const { tender, dedupeKey, ai: aiVerdict } = c;
       seen.add(dedupeKey);
       newIkns.push(dedupeKey);
-      const message = formatMessage(tender, kw, cfg.messageTemplate);
-      const record = { keyword: kw, ikn: tender.ikn, tender, message, sent: [], ai: aiVerdict };
+      const message = formatMessage(tender, '', cfg.messageTemplate);
+      const record = { keyword: '', ikn: tender.ikn, tender, message, sent: [], ai: aiVerdict };
 
       if (wa.isReady() && cfg.recipients?.length) {
         for (const rcpt of cfg.recipients) {
@@ -268,10 +277,17 @@ async function runOnce() {
       emitMatch(record);
     }
 
+    // Adayları seen'e ekle (AI onayladıkları + reddedildikleri + değerlendirilmedikleri)
+    // Reddedilenler tekrar AI'ya sorulmasın diye seen'e ekleniyor
+    for (const c of candidates) {
+      seen.add(c.dedupeKey);
+      newIkns.push(c.dedupeKey);
+    }
+
     if (newIkns.length) storage.addSeen(newIkns);
     state.lastRun = new Date().toISOString();
     state.error = null;
-    log(`✅ Tarama bitti — ${approved.length} mesaj, ${aiRejected} AI eledi, ${filteredOut} kelime eledi, ${skippedSeen} duplikat`);
+    log(`✅ Tarama bitti — ${approved.length} WhatsApp mesajı, ${aiRejected} AI eledi, ${blacklisted} blacklist eledi, ${skippedSeen} eski`);
   } catch (err) {
     state.error = err.message;
     log(`Tarama hatası: ${err.message}`, 'error');

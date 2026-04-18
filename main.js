@@ -70,8 +70,10 @@ ipcMain.handle('monitor:stop', () => monitor.stop());
 ipcMain.handle('monitor:status', () => monitor.getStatus());
 ipcMain.handle('monitor:runOnce', () => monitor.runOnce());
 ipcMain.handle('monitor:matches', () => storage.getMatches());
+ipcMain.handle('monitor:scanned', () => storage.getScanned());
 ipcMain.handle('monitor:clearSeen', () => storage.clearSeen());
 ipcMain.handle('monitor:clearMatches', () => storage.clearMatches());
+ipcMain.handle('monitor:clearScanned', () => storage.clearScanned());
 
 ipcMain.handle('ai:test', async (_e, { provider, apiKey, model }) => {
   return ai.testConnection({ provider, apiKey, model });

@@ -83,6 +83,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
         Eşleşmeler
       </button>
+      <button class="nav-item" data-tab="scanned">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Taranan İhaleler
+      </button>
       <button class="nav-item" data-tab="logs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
         Günlük
@@ -387,6 +391,30 @@
       </header>
       <div class="card">
         <div id="matchBox" class="match-list"></div>
+      </div>
+    </section>
+
+    <!-- Scanned -->
+    <section class="view" data-view="scanned">
+      <header class="view-header">
+        <div>
+          <h1>Taranan İhaleler</h1>
+          <p class="view-sub">EKAP'tan çekilip değerlendirilen tüm ihaleler (AI verdict ile)</p>
+        </div>
+        <div class="view-actions">
+          <input id="scannedFilter" placeholder="Ara…" class="input-inline" />
+          <select id="scannedFilterRelevant" class="input-inline">
+            <option value="all">Tümü</option>
+            <option value="relevant">Sadece alakalı</option>
+            <option value="irrelevant">Sadece alakasız</option>
+            <option value="unjudged">Değerlendirilmemiş</option>
+          </select>
+          <button id="refreshScanned" class="btn btn-ghost">Yenile</button>
+          <button id="clearScanned" class="btn btn-ghost">Geçmişi Temizle</button>
+        </div>
+      </header>
+      <div class="card">
+        <div id="scannedBox" class="match-list"></div>
       </div>
     </section>
 

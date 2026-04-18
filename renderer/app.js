@@ -131,6 +131,16 @@ on('clearMatches', 'click', async () => {
   refreshMatches();
   logLocal('Eşleşme geçmişi temizlendi');
 });
+
+on('refreshScanned', 'click', () => refreshScanned());
+on('clearScanned', 'click', async () => {
+  if (!confirm('Taranan ihale geçmişi temizlensin mi? Geri alınamaz.')) return;
+  await api.clearScanned();
+  refreshScanned();
+  logLocal('Taranan ihale geçmişi temizlendi');
+});
+on('scannedFilter', 'input', () => refreshScanned());
+on('scannedFilterRelevant', 'change', () => refreshScanned());
 on('clearLogs', 'click', () => {
   if (el('logBox')) el('logBox').innerHTML = '';
   if (el('logBoxFull')) el('logBoxFull').innerHTML = '';
@@ -274,6 +284,7 @@ if (api.onLog) api.onLog((l) => logEntry(l));
 if (api.onMatch) api.onMatch((m) => {
   logLocal(`Yeni eşleşme: ${m.tender?.name || m.ikn}`);
   refreshMatches();
+  refreshScanned();
 });
 
 // ── Log helpers ─────────────────────────────────────────────────────────────
@@ -378,6 +389,54 @@ async function refreshMatches() {
     '<div class="muted small" style="padding:0.5rem">Henüz eşleşme yok.</div>';
 }
 
+async function refreshScanned() {
+  if (!api.getScanned) return;
+  const list = await api.getScanned();
+  const box = el('scannedBox');
+  if (!box) return;
+
+  const filter = (el('scannedFilter')?.value || '').toLowerCase().trim();
+  const relevantFilter = el('scannedFilterRelevant')?.value || 'all';
+
+  let items = list;
+  if (relevantFilter === 'relevant') items = items.filter((s) => s.relevant === true);
+  else if (relevantFilter === 'irrelevant') items = items.filter((s) => s.relevant === false);
+  else if (relevantFilter === 'unjudged') items = items.filter((s) => s.relevant === null || s.relevant === undefined);
+
+  if (filter) {
+    items = items.filter((s) =>
+      [s.tender?.name, s.tender?.authority, s.tender?.province, s.ikn]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(filter))
+    );
+  }
+
+  box.innerHTML = items.slice(0, 100).map((s) => {
+    const t = s.tender || {};
+    const ai = s.ai || null;
+    const aiPct = ai && typeof ai.confidence === 'number' ? Math.round(ai.confidence * 100) : null;
+    const verdict = s.relevant === true
+      ? `<span class="badge ok" title="${esc(ai?.reason || '')}">🤖 alakalı %${aiPct ?? '?'}</span>`
+      : s.relevant === false
+        ? `<span class="badge err" title="${esc(ai?.reason || '')}">🤖 alakasız %${aiPct ?? '?'}</span>`
+        : `<span class="badge">değerlendirilmedi</span>`;
+    return `
+      <div class="match">
+        <div class="title">${esc(t.name || s.ikn || '(başlıksız)')}</div>
+        <div class="meta">
+          ${verdict}
+          ${t.type?.description ? `<span class="badge">${esc(t.type.description)}</span>` : ''}
+          ${t.province ? `<span class="badge">${esc(t.province)}</span>` : ''}
+        </div>
+        <div class="meta">
+          ${esc(t.authority || '-')} · IKN ${esc(s.ikn || '-')} · ${new Date(s.scannedAt).toLocaleString('tr-TR')}
+        </div>
+        ${ai?.reason ? `<div class="meta" style="font-style:italic">${esc(ai.reason)}</div>` : ''}
+      </div>
+    `;
+  }).join('') || '<div class="muted small" style="padding:0.5rem">Henüz taranan ihale yok. "Şimdi Tara"ya basın.</div>';
+}
+
 async function refreshStatuses() {
   const [wa, mon] = await Promise.all([api.whatsappStatus(), api.monitorStatus()]);
   if (wa) updateWAStatus(wa.status || '—', !!wa.ready);
@@ -452,9 +511,15 @@ async function showVersion() {
   } catch (_) {}
 }
 
+// Tab değişiminde Taranan İhaleler sekmesine geçilince yenile
+document.querySelectorAll('.nav-item[data-tab="scanned"]').forEach((b) => {
+  b.addEventListener('click', () => refreshScanned());
+});
+
 // ── Init ────────────────────────────────────────────────────────────────────
 loadConfig();
 refreshMatches();
+refreshScanned();
 refreshStatuses();
 showVersion();
 setInterval(refreshStatuses, 5000);

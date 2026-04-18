@@ -79,3 +79,21 @@ exports.addMatch = (match) => {
   writeJson('matches.json', list);
 };
 exports.clearMatches = () => writeJson('matches.json', []);
+
+// Tüm taranan ihaleler (AI verdict ile birlikte) — son 1000
+exports.getScanned = () => readJson('scanned.json', []);
+exports.addScanned = (records) => {
+  if (!records?.length) return;
+  const existing = readJson('scanned.json', []);
+  const seenIkns = new Set(existing.map((r) => r.ikn || r.dedupeKey));
+  const fresh = records.filter((r) => {
+    const k = r.ikn || r.dedupeKey;
+    if (!k || seenIkns.has(k)) return false;
+    seenIkns.add(k);
+    return true;
+  });
+  const merged = [...fresh, ...existing];
+  if (merged.length > 1000) merged.length = 1000;
+  writeJson('scanned.json', merged);
+};
+exports.clearScanned = () => writeJson('scanned.json', []);
