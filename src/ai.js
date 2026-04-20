@@ -506,7 +506,7 @@ const deepseek = makeOpenAICompat({
   defaultModel: 'deepseek-chat',
 });
 
-const openrouter = makeOpenAICompat({
+const openrouterBase = makeOpenAICompat({
   baseUrl: 'https://openrouter.ai/api/v1',
   defaultModel: 'deepseek/deepseek-chat:free',
   extraHeaders: () => ({
@@ -514,6 +514,16 @@ const openrouter = makeOpenAICompat({
     'X-Title': 'Baratoprak Ihale Bot',
   }),
 });
+const openrouter = {
+  ...openrouterBase,
+  async listModels(args) {
+    const all = await openrouterBase.listModels(args);
+    // :free modelleri üste koy, sonra ücretliler
+    const free = all.filter((m) => /:free$/i.test(m.name));
+    const paid = all.filter((m) => !/:free$/i.test(m.name));
+    return [...free, ...paid];
+  },
+};
 
 const cerebras = makeOpenAICompat({
   baseUrl: 'https://api.cerebras.ai/v1',
