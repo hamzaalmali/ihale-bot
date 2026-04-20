@@ -219,6 +219,14 @@
             <input id="blacklist" placeholder="giyim, yemek, tavuk, zemin kaplama, gübre, ilaç" />
           </label>
           <label class="field">
+            <span>ilan.gov.tr Taraması</span>
+            <small>BİK ve UYAP üzerinden yayımlanan ihale duyurularını da tara</small>
+            <select id="scanIlan">
+              <option value="true">Açık (EKAP + ilan.gov.tr)</option>
+              <option value="false">Kapalı (sadece EKAP)</option>
+            </select>
+          </label>
+          <label class="field">
             <span>İhale Türleri</span>
             <small>seçim yoksa tümü; çoklu için Ctrl/Cmd+tıklayın</small>
             <select id="tenderTypes" multiple size="4">

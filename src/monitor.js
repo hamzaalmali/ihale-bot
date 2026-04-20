@@ -175,7 +175,59 @@ async function runOnce() {
       await new Promise((r) => setTimeout(r, 400));
     }
 
-    log(`Aday: ${candidates.length} yeni ihale (EKAP'tan toplam: ${totalFromEkap}, blacklist eledi: ${blacklisted}, daha önce: ${skippedSeen})`);
+    log(`EKAP tarama bitti: ${totalFromEkap} ihale çekildi`);
+
+    // 1b) ilan.gov.tr taraması — BİK + UYAP ihale duyuruları
+    if (cfg.scanIlan !== false) {
+      log(`📥 ilan.gov.tr'den ihale duyuruları çekiliyor…`);
+      let ilanTotal = 0;
+      for (let page = 1; page <= 10; page++) {
+        let res;
+        try {
+          res = await api.searchIlanAds({
+            adTypeFilter: 'İHALE',
+            maxResultCount: 50,
+            currentPage: page,
+          });
+        } catch (err) {
+          log(`ilan sayfa ${page} hatası: ${err.message}`, 'error');
+          break;
+        }
+        if (res.error) {
+          log(`ilan sayfa ${page} hatası: ${res.error}${res.message ? ' — ' + res.message : ''}`, 'error');
+          break;
+        }
+        const ads = res.ads || [];
+        ilanTotal += ads.length;
+        log(`  ilan sayfa ${page}: ${ads.length} kayıt`);
+        for (const ad of ads) {
+          // ilan kayıtlarını tender benzeri şekle çevir
+          const tender = {
+            name: ad.title,
+            authority: ad.advertiser_name,
+            province: ad.city,
+            type: { description: 'İlan (' + (ad.ad_source || '') + ')' },
+            ikn: ad.ad_no,
+            id: ad.id,
+            document_url: ad.full_url,
+            source: 'ilan.gov.tr',
+          };
+          if (hitsBlacklist(tender, cfg.blacklist)) { blacklisted++; continue; }
+          const dedupeKey = tender.ikn
+            || _norm(tender.name || '').slice(0, 160)
+            || String(tender.id || '');
+          if (!dedupeKey) continue;
+          if (seen.has(dedupeKey)) { skippedSeen++; continue; }
+          if (candidates.find((c) => c.dedupeKey === dedupeKey)) continue;
+          candidates.push({ tender, dedupeKey });
+        }
+        if (ads.length < 50) break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      log(`ilan.gov.tr tarama bitti: ${ilanTotal} kayıt`);
+    }
+
+    log(`Aday: ${candidates.length} yeni (EKAP+ilan toplam: ${totalFromEkap}+[ilan], blacklist eledi: ${blacklisted}, daha önce: ${skippedSeen})`);
 
     // 2) AI batch sınıflandırma (varsa)
     let approved = candidates;

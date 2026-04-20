@@ -35,6 +35,7 @@ async function loadConfig() {
   if (el('searchType')) el('searchType').value = cfg.searchType || 'TumKelimeler';
   if (el('strictTitleMatch')) el('strictTitleMatch').value = String(cfg.strictTitleMatch !== false);
   if (el('blacklist')) el('blacklist').value = (cfg.blacklist || []).join(', ');
+  if (el('scanIlan')) el('scanIlan').value = String(cfg.scanIlan !== false);
   if (el('aiEnabled')) el('aiEnabled').value = String(!!cfg.aiEnabled);
   if (el('aiProvider')) el('aiProvider').value = cfg.aiProvider || 'groq';
   if (el('aiModel') && cfg.aiModel) ensureModelInDropdown(cfg.aiModel);
@@ -87,6 +88,7 @@ on('saveConfig', 'click', async () => {
     searchType: el('searchType')?.value || 'TumKelimeler',
     strictTitleMatch: (el('strictTitleMatch')?.value || 'true') === 'true',
     blacklist: splitList(el('blacklist')?.value || ''),
+    scanIlan: (el('scanIlan')?.value || 'true') === 'true',
     aiEnabled: (el('aiEnabled')?.value || 'false') === 'true',
     aiProvider: el('aiProvider')?.value || 'groq',
     aiModel: el('aiModel')?.value || '',

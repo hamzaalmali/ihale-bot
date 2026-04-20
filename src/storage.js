@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
   searchType: 'TumKelimeler',  // 'GirdigimGibi' (tam ibare) veya 'TumKelimeler' (her kelime ayrı)
   strictTitleMatch: true,  // true: anahtar kelimenin kökü ihale başlığında geçmeli
   blacklist: [],           // başlıkta bu kelimelerden biri geçerse ihaleyi at
+  scanIlan: true,          // ilan.gov.tr'yi de tara (BİK + UYAP ihale duyuruları)
   // Yapay zeka filtre (Google Gemini)
   aiEnabled: false,
   aiProvider: 'groq',
