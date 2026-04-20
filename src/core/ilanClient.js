@@ -35,26 +35,47 @@ const insecureAgent = new https.Agent({
   secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
 });
 
-let undiciDispatcher = null;
-try {
-  const { Agent: UndiciAgent } = require('undici');
-  undiciDispatcher = new UndiciAgent({
-    connect: { rejectUnauthorized: false },
-    keepAliveTimeout: 10_000,
-    keepAliveMaxTimeout: 30_000,
+function httpsRequest(urlString, { method = 'GET', headers = {}, body = null } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + (u.search || ''),
+        method,
+        headers,
+        rejectUnauthorized: false,
+        agent: insecureAgent,
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            status: res.statusCode,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            text: async () => text,
+            json: async () => JSON.parse(text),
+          });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(60_000, () => req.destroy(new Error('Timeout 60s')));
+    if (body) req.write(body);
+    req.end();
   });
-} catch (_) {}
+}
 
 async function postJson(endpoint, payload) {
-  const res = await fetch(BASE_URL + endpoint, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify(payload),
-    dispatcher: undiciDispatcher,
-  });
+  const body = JSON.stringify(payload);
+  const headers = { ...HEADERS, 'Content-Length': Buffer.byteLength(body).toString() };
+  const res = await httpsRequest(BASE_URL + endpoint, { method: 'POST', headers, body });
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${body.slice(0, 160)}`);
+    const t = await res.text();
+    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${t.slice(0, 160)}`);
     err.status = res.status;
     throw err;
   }
@@ -63,14 +84,10 @@ async function postJson(endpoint, payload) {
 
 async function getJson(endpoint, params) {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${BASE_URL}${endpoint}?${qs}`, {
-    method: 'GET',
-    headers: HEADERS,
-    dispatcher: undiciDispatcher,
-  });
+  const res = await httpsRequest(`${BASE_URL}${endpoint}?${qs}`, { method: 'GET', headers: HEADERS });
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${body.slice(0, 160)}`);
+    const t = await res.text();
+    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${t.slice(0, 160)}`);
     err.status = res.status;
     throw err;
   }

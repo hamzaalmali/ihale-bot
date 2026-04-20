@@ -59,20 +59,56 @@ const insecureAgent = new https.Agent({
   secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
 });
 
-// Node/Electron fetch (undici tabanlı) için dispatcher — `agent` yok sayılır,
-// doğru anahtar `dispatcher`'dır. Undici Agent ile TLS gevşetmesi burada uygulanır.
-let undiciDispatcher = null;
-try {
-  const { Agent: UndiciAgent } = require('undici');
-  undiciDispatcher = new UndiciAgent({
-    connect: { rejectUnauthorized: false },
-    keepAliveTimeout: 10_000,
-    keepAliveMaxTimeout: 30_000,
-    headersTimeout: 30_000,
-    bodyTimeout: 60_000,
+// Native https tabanlı fetch yerine — Electron'un dahili fetch'i `agent` yok
+// sayar, `dispatcher` undici instance uyumsuzluğu yaşatır. Direkt https modülü
+// ile istek atmak TLS gevşetmesini garanti eder (Python verify=False karşılığı).
+function httpsRequest(urlString, { method = 'GET', headers = {}, body = null, redirect = 'follow' } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + (u.search || ''),
+        method,
+        headers,
+        rejectUnauthorized: false,
+        agent: insecureAgent,
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          const rawText = buf.toString('utf8');
+          const setCookie = res.headers['set-cookie'] || [];
+          const result = {
+            status: res.statusCode,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            headers: {
+              get: (n) => {
+                const k = String(n).toLowerCase();
+                for (const [hk, hv] of Object.entries(res.headers)) {
+                  if (String(hk).toLowerCase() === k) return Array.isArray(hv) ? hv.join(', ') : hv;
+                }
+                return null;
+              },
+              getSetCookie: () => (Array.isArray(setCookie) ? setCookie : [setCookie]).filter(Boolean),
+            },
+            text: async () => rawText,
+            json: async () => JSON.parse(rawText),
+          };
+          resolve(result);
+        });
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(60_000, () => {
+      req.destroy(new Error('Timeout 60s'));
+    });
+    if (body) req.write(body);
+    req.end();
   });
-} catch (_) {
-  // undici yoksa sessizce fallback'e düşer
 }
 
 function aesCbcEncryptB64(plaintext, key, iv) {
@@ -132,22 +168,21 @@ function getSetCookieArray(res) {
 
 async function postJson(endpoint, payload) {
   const url = endpoint.startsWith('http') ? endpoint : BASE_URL + endpoint;
-  const headers = { ...COMMON_HEADERS, ...generateSecurityHeaders() };
+  const body = JSON.stringify(payload);
+  const headers = {
+    ...COMMON_HEADERS,
+    ...generateSecurityHeaders(),
+    'Content-Length': Buffer.byteLength(body).toString(),
+  };
   let res;
   try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      dispatcher: undiciDispatcher, // TLS gevşetmesi (Python verify=False karşılığı)
-    });
+    res = await httpsRequest(url, { method: 'POST', headers, body });
   } catch (err) {
-    const cause = err?.cause?.code || err?.cause?.message || err?.code || '';
-    const detail = cause ? ` (${cause})` : '';
-    throw new Error(`EKAP bağlantı hatası${detail}: ${err.message}`);
+    const code = err?.code || '';
+    throw new Error(`EKAP bağlantı hatası${code ? ` (${code})` : ''}: ${err.message}`);
   }
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
+    const text = await res.text();
     const err = new Error(`EKAP ${endpoint} HTTP ${res.status} — ${text.slice(0, 200)}`);
     err.status = res.status;
     err.body = text;
@@ -164,28 +199,19 @@ async function getLegacy(url, params, extraCookies = null) {
   const headers = { ...LEGACY_HEADERS };
   if (cookieHeader) headers.Cookie = cookieHeader;
 
-  const res = await fetch(full, {
-    method: 'GET',
-    headers,
-    redirect: 'manual',
-    dispatcher: undiciDispatcher,
-  });
-  mergeSetCookies(getSetCookieArray(res));
+  const res = await httpsRequest(full, { method: 'GET', headers });
+  mergeSetCookies(res.headers.getSetCookie());
 
   // Python logic: if 302 → /EKAP/error_page.html and no cookies provided, warm up and retry once.
   const location = res.headers.get('location') || '';
   if (res.status === 302 && location.includes('/EKAP/error_page.html') && !extraCookies) {
     await warmupLegacy();
-    const res2 = await fetch(full, {
+    const res2 = await httpsRequest(full, {
       method: 'GET',
       headers: { ...LEGACY_HEADERS, Cookie: jarAsHeader() },
-      redirect: 'manual',
-      dispatcher: undiciDispatcher,
     });
-    mergeSetCookies(getSetCookieArray(res2));
-    if (!res2.ok) {
-      throw new Error(`EKAP legacy HTTP ${res2.status}`);
-    }
+    mergeSetCookies(res2.headers.getSetCookie());
+    if (!res2.ok) throw new Error(`EKAP legacy HTTP ${res2.status}`);
     return res2.json();
   }
   if (!res.ok) throw new Error(`EKAP legacy HTTP ${res.status}`);
@@ -194,7 +220,7 @@ async function getLegacy(url, params, extraCookies = null) {
 
 async function warmupLegacy() {
   try {
-    const r1 = await fetch(LEGACY_WARMUP_URL, {
+    const r1 = await httpsRequest(LEGACY_WARMUP_URL, {
       method: 'GET',
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -202,27 +228,20 @@ async function warmupLegacy() {
         'User-Agent': LEGACY_HEADERS['User-Agent'],
         Connection: 'keep-alive',
       },
-      redirect: 'follow',
-      dispatcher: undiciDispatcher,
     });
-    mergeSetCookies(getSetCookieArray(r1));
+    mergeSetCookies(r1.headers.getSetCookie());
   } catch (_) {}
   try {
-    const r2 = await fetch(
-      `${DIRECT_PROCUREMENT_URL}?metot=idareAra&aranan=a`,
-      {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json, text/plain, */*',
-          'Accept-Language': 'tr-TR,tr;q=0.9',
-          'User-Agent': LEGACY_HEADERS['User-Agent'],
-          Connection: 'keep-alive',
-        },
-        redirect: 'follow',
-        dispatcher: undiciDispatcher,
-      }
-    );
-    mergeSetCookies(getSetCookieArray(r2));
+    const r2 = await httpsRequest(`${DIRECT_PROCUREMENT_URL}?metot=idareAra&aranan=a`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+        'User-Agent': LEGACY_HEADERS['User-Agent'],
+        Connection: 'keep-alive',
+      },
+    });
+    mergeSetCookies(r2.headers.getSetCookie());
   } catch (_) {}
 }
 
