@@ -352,7 +352,180 @@ const groq = {
   },
 };
 
-const PROVIDERS = { gemini, groq };
+// ── OpenAI-compat generic adapter (Groq, DeepSeek, OpenRouter, Cerebras, SambaNova) ──
+const https = require('https');
+
+function oaiHttpsRequest(urlString, { method, headers, body }) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + (u.search || ''),
+        method,
+        headers,
+        rejectUnauthorized: false,
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            status: res.statusCode,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            text: () => Promise.resolve(text),
+            json: () => Promise.resolve(JSON.parse(text)),
+          });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(90_000, () => req.destroy(new Error('Timeout 90s')));
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+function makeOpenAICompat({ baseUrl, defaultModel, extraHeaders = () => ({}) }) {
+  return {
+    async listModels({ apiKey }) {
+      if (!apiKey) throw new Error('API anahtarı gerekli');
+      const res = await oaiHttpsRequest(baseUrl + '/models', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${apiKey}`, ...extraHeaders() },
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw tagError(new Error(`Model listesi alınamadı (${res.status}): ${t.slice(0, 160)}`), res.status);
+      }
+      const data = await res.json();
+      const models = Array.isArray(data.data) ? data.data : (data.models || []);
+      return models
+        .filter((m) => m.active !== false)
+        .filter((m) => !/whisper|tts|embedding|guard|vision|prompt-guard|audio|image|dall/i.test(m.id || m.name || ''))
+        .map((m) => ({
+          name: m.id || m.name,
+          displayName: m.name || m.id,
+          inputTokenLimit: m.context_length || m.context_window || null,
+        }))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    },
+
+    async classify({ tender, businessContext, keywords, apiKey, model }) {
+      if (!apiKey) throw new Error('API anahtarı yok');
+      const body = {
+        model: model || defaultModel,
+        messages: [
+          { role: 'system', content: 'Yalnızca geçerli JSON döndüren bir analistsin. Açıklama yazma, code fence kullanma.' },
+          { role: 'user', content: buildPrompt({ tender, businessContext, keywords }) },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 256,
+      };
+      const res = await oaiHttpsRequest(baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          ...extraHeaders(),
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw tagError(new Error(`${baseUrl} ${res.status}: ${t.slice(0, 240)}`), res.status);
+      }
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      const parsed = extractJson(text);
+      if (!parsed) throw new Error('Yanıt JSON olarak ayrıştırılamadı: ' + text.slice(0, 200));
+      return {
+        relevant: !!parsed.relevant,
+        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : null,
+        reason: String(parsed.reason || '').slice(0, 240),
+      };
+    },
+
+    async test({ apiKey, model }) {
+      return this.classify({ ...SAMPLE, apiKey, model });
+    },
+
+    async classifyBatch({ tenders, businessContext, keywords, apiKey, model }) {
+      if (!apiKey) throw new Error('API anahtarı yok');
+      const items = tenders.map((t, i) => ({
+        idx: i,
+        title: t.name || '',
+        authority: t.authority || '',
+        city: t.province || '',
+        type: t.type?.description || '',
+      }));
+      const body = {
+        model: model || defaultModel,
+        messages: [
+          { role: 'system', content: 'Yalnızca geçerli JSON döndüren bir analistsin. Açıklama yazma, code fence kullanma.' },
+          { role: 'user', content: buildBatchPrompt({ businessContext, keywords, items }) },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 4096,
+      };
+      const res = await oaiHttpsRequest(baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          ...extraHeaders(),
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw tagError(new Error(`${baseUrl} ${res.status}: ${t.slice(0, 240)}`), res.status);
+      }
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      const parsed = extractJson(text);
+      if (!parsed || !Array.isArray(parsed.results)) {
+        throw new Error('Batch yanıtı ayrıştırılamadı: ' + text.slice(0, 200));
+      }
+      return parsed.results;
+    },
+  };
+}
+
+const openai = makeOpenAICompat({
+  baseUrl: 'https://api.openai.com/v1',
+  defaultModel: 'gpt-4o-mini',
+});
+
+const deepseek = makeOpenAICompat({
+  baseUrl: 'https://api.deepseek.com/v1',
+  defaultModel: 'deepseek-chat',
+});
+
+const openrouter = makeOpenAICompat({
+  baseUrl: 'https://openrouter.ai/api/v1',
+  defaultModel: 'deepseek/deepseek-chat:free',
+  extraHeaders: () => ({
+    'HTTP-Referer': 'https://github.com/hamzaalmali/ihale-bot',
+    'X-Title': 'Baratoprak Ihale Bot',
+  }),
+});
+
+const cerebras = makeOpenAICompat({
+  baseUrl: 'https://api.cerebras.ai/v1',
+  defaultModel: 'llama-3.3-70b',
+});
+
+const sambanova = makeOpenAICompat({
+  baseUrl: 'https://api.sambanova.ai/v1',
+  defaultModel: 'Meta-Llama-3.3-70B-Instruct',
+});
+
+const PROVIDERS = { gemini, groq, openai, deepseek, openrouter, cerebras, sambanova };
 function pick(p) {
   const sel = PROVIDERS[p] || PROVIDERS.gemini;
   return sel;
