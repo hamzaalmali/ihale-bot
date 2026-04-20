@@ -273,9 +273,10 @@
         <div class="card wide">
           <h2 class="card-title">🤖 Yapay Zeka Filtre (ücretsiz)</h2>
           <p class="muted small">
-            Kelime filtresinden geçen sonuçları AI'ya danışır: "bu ihale gerçekten alakalı mı?" Sağlayıcı seçin, ücretsiz API anahtarı alın.<br>
-            <strong>Gemini</strong> → <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> · 1500 istek/gün, bazı bölgelerde dar kota.<br>
-            <strong>Groq</strong> → <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> · 14.400 istek/gün, Llama 3.3 70B, kart gerektirmez (önerilen).
+            Aday ihaleleri AI'ya danışır: "bu ihale gerçekten alakalı mı?". Sağlayıcı seçin, ücretsiz API anahtarı alın.<br>
+            <strong>Gemini</strong> → <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> · 1500 istek/gün.<br>
+            <strong>Groq</strong> → <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> · kart istemez. TPD için <code>llama-3.1-8b-instant</code> (500K TPD) <code>llama-3.3-70b-versatile</code>'dan (100K TPD) 5x daha cömerttir.<br>
+            <em>AI değerlendiremediği ihaleler sonraki taramada tekrar denenir.</em>
           </p>
           <div class="grid-3">
             <label class="field">

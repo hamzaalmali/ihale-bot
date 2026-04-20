@@ -18,7 +18,21 @@ const DEFAULT_CONFIG = {
   aiProvider: 'groq',
   aiModel: '',  // "Modelleri Yükle" ile API'den listelenip seçilecek
   aiApiKey: '',
-  aiBusinessContext: 'Elektrik dağıtım şirketleri için SCADA, OG/AG pano, kontrol panosu, trafo, RMU, kesici gibi orta gerilim ve otomasyon ekipmanları üretiyor/kuruyoruz.',
+  aiBusinessContext:
+    'Elektrik dağıtım şirketlerine (TEDAŞ, TEİAŞ, özel dağıtım şirketleri, ' +
+    'OEDAŞ/BEDAŞ/SEDAŞ vb.) ve sanayiye yönelik şu işleri yapıyoruz:\n' +
+    '• SCADA yazılımı kurulum/güncelleme, enerji yönetim sistemleri (DMS/EMS/OMS)\n' +
+    '• Uzak Terminal Birimi (RTU) ve PLC temini, montajı, devreye alma\n' +
+    '• Koruma rölesi, ayıran, kesici, ölçü transformatörü temini/montajı\n' +
+    '• OG/AG pano, modüler hücre, kompakt hücre, kontrol panosu üretimi\n' +
+    '• Trafo, transformatör merkezi, RMU (Ring Main Unit) temini\n' +
+    '• Fiber/GPRS/GSM haberleşme sistemleri, IEC 61850 entegrasyonu\n' +
+    '• Uzaktan izleme, sayaç okuma, enerji izleme sistemleri\n' +
+    '• Anahtar teslim elektrik otomasyonu projeleri, primer/sekonder koruma\n' +
+    'Alakalı: bu kalemlerin tedariki/üretimi/kurulumu/montajı/bakımı/yazılım geliştirme.\n' +
+    'Alakasız: giyim, gıda, yemek, ilaç, yakıt, temizlik, inşaat/bina yapımı, ' +
+    'yol/asfalt, mobilya, IT/bilgisayar/yazılım (SCADA dışı), kırtasiye, ' +
+    'araç kiralama/taşıma, personel hizmeti.',
   aiMinConfidence: 0.5,
   messageTemplate:
     'Yeni ihale bulundu 🔔\n\n' +

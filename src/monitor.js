@@ -183,26 +183,52 @@ async function runOnce() {
     let aiRejected = 0;
     if (cfg.aiEnabled && cfg.aiApiKey && candidates.length > 0) {
       const provider = cfg.aiProvider || 'gemini';
-      const model = cfg.aiModel || (provider === 'groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.0-flash-lite');
+      const model = cfg.aiModel || (provider === 'groq' ? 'llama-3.1-8b-instant' : 'gemini-2.0-flash-lite');
       const minConf = typeof cfg.aiMinConfidence === 'number' ? cfg.aiMinConfidence : 0.5;
-      const chunkSize = 25;
+      const chunkSize = cfg.aiBatchSize || 10;
       const verdicts = []; // {idx (global), relevant, confidence, reason}
       let aiDisabled = false;
-      log(`🤖 AI toplu değerlendirme başlıyor: ${candidates.length} aday → ${Math.ceil(candidates.length / chunkSize)} parti (${provider}/${model})`);
+      log(`🤖 AI toplu değerlendirme başlıyor: ${candidates.length} aday → ${Math.ceil(candidates.length / chunkSize)} parti × ${chunkSize} (${provider}/${model})`);
+
+      const callBatch = async (slice) => ai.classifyBatch({
+        provider,
+        apiKey: cfg.aiApiKey,
+        model,
+        businessContext: cfg.aiBusinessContext,
+        keywords: cfg.keywords,
+        tenders: slice.map((c) => c.tender),
+      });
 
       for (let off = 0; off < candidates.length; off += chunkSize) {
         if (aiDisabled) break;
         const slice = candidates.slice(off, off + chunkSize);
-        try {
-          const partial = await ai.classifyBatch({
-            provider,
-            apiKey: cfg.aiApiKey,
-            model,
-            businessContext: cfg.aiBusinessContext,
-            keywords: cfg.keywords,
-            tenders: slice.map((c) => c.tender),
-          });
-          // partial[i].idx slice içindeki index — global'e dönüştür
+        let partial = null;
+        let partRetried = false;
+        while (true) {
+          try {
+            partial = await callBatch(slice);
+            break;
+          } catch (err) {
+            if (err.code === 'RATE_LIMIT' && !partRetried) {
+              partRetried = true;
+              log(`  🤖 ${provider} TPM/kota sınırı — 60 sn beklenip tekrar denenecek`, 'warn');
+              await new Promise((r) => setTimeout(r, 60_000));
+              continue;
+            }
+            if (err.code === 'RATE_LIMIT') {
+              log(`  🤖 ${provider} kota dolu — kalan ${candidates.length - off} aday değerlendirilmedi (sonraki taramada tekrar denenecek)`, 'warn');
+            } else if (err.code === 'AUTH') {
+              log(`  🤖 API anahtarı geçersiz — AI devre dışı`, 'error');
+            } else if (err.code === 'MODEL_NOT_FOUND') {
+              log(`  🤖 Model bulunamadı (${model})`, 'error');
+            } else {
+              log(`  🤖 AI hatası: ${err.message}`, 'warn');
+            }
+            aiDisabled = true;
+            break;
+          }
+        }
+        if (partial) {
           for (const v of partial) {
             const localIdx = Number(v.idx);
             if (Number.isInteger(localIdx) && localIdx >= 0 && localIdx < slice.length) {
@@ -210,23 +236,10 @@ async function runOnce() {
             }
           }
           log(`  🤖 parti ${Math.floor(off / chunkSize) + 1}: ${partial.length} sonuç döndü`);
-        } catch (err) {
-          if (err.code === 'RATE_LIMIT') {
-            aiDisabled = true;
-            log(`  🤖 ${provider} kotası doldu — geri kalan ${candidates.length - off} aday AI olmadan WhatsApp'a gönderilecek`, 'warn');
-          } else if (err.code === 'AUTH') {
-            aiDisabled = true;
-            log(`  🤖 API anahtarı geçersiz — AI devre dışı, kelime filtresiyle gönderilecek`, 'error');
-          } else if (err.code === 'MODEL_NOT_FOUND') {
-            aiDisabled = true;
-            log(`  🤖 Model bulunamadı (${model}) — AI devre dışı`, 'error');
-          } else {
-            log(`  🤖 AI hatası: ${err.message}`, 'warn');
-          }
         }
-        // Sağlayıcı rate limit
+        // Partiler arası bekleme (RPM/TPM dostu)
         if (!aiDisabled && off + chunkSize < candidates.length) {
-          await new Promise((r) => setTimeout(r, provider === 'groq' ? 2200 : 4500));
+          await new Promise((r) => setTimeout(r, provider === 'groq' ? 3500 : 4500));
         }
       }
 
@@ -296,11 +309,13 @@ async function runOnce() {
       emitMatch(record);
     }
 
-    // Adayları seen'e ekle (AI onayladıkları + reddedildikleri + değerlendirilmedikleri)
-    // Reddedilenler tekrar AI'ya sorulmasın diye seen'e ekleniyor
+    // Seen'e SADECE AI tarafından değerlendirilmiş (onaylı ya da reddedilmiş) adayları ekle.
+    // AI değerlendiremediği (kota dolmuş) adaylar bir sonraki taramada tekrar denenecek.
     for (const c of candidates) {
-      seen.add(c.dedupeKey);
-      newIkns.push(c.dedupeKey);
+      if (c.ai !== null && c.ai !== undefined) {
+        seen.add(c.dedupeKey);
+        newIkns.push(c.dedupeKey);
+      }
     }
 
     if (newIkns.length) storage.addSeen(newIkns);
