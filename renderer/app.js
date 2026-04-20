@@ -107,6 +107,14 @@ on('startWA', 'click', async () => {
   catch (e) { alert('WhatsApp başlatılamadı: ' + e.message); }
 });
 on('stopWA', 'click', () => api.stopWhatsApp && api.stopWhatsApp());
+on('restartWA', 'click', async () => {
+  try {
+    logLocal('WhatsApp yeniden başlatılıyor…');
+    await api.restartWhatsApp();
+  } catch (e) {
+    alert('Yeniden başlatma hatası: ' + e.message);
+  }
+});
 on('sendTest', 'click', async () => {
   try {
     await api.testWhatsApp(el('testNumber').value, el('testText').value || 'test');

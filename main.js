@@ -61,6 +61,7 @@ ipcMain.handle('config:set', (_e, cfg) => storage.setConfig(cfg));
 
 ipcMain.handle('wa:start', () => wa.start());
 ipcMain.handle('wa:stop', () => wa.stop());
+ipcMain.handle('wa:restart', () => wa.restart());
 ipcMain.handle('wa:status', () => wa.getStatus());
 ipcMain.handle('wa:test', (_e, number, text) => wa.sendMessage(number, text));
 ipcMain.handle('wa:groups', () => wa.listGroups());

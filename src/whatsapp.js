@@ -130,8 +130,17 @@ async function listGroups() {
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'tr'));
 }
 
+async function restart() {
+  emit('status', 'restarting');
+  try { await stop(); } catch (_) {}
+  // Puppeteer/Chromium tam kapansın diye kısa bekleme
+  await new Promise((r) => setTimeout(r, 1500));
+  return start();
+}
+
 exports.start = start;
 exports.stop = stop;
+exports.restart = restart;
 exports.sendMessage = sendMessage;
 exports.listGroups = listGroups;
 exports.getStatus = () => ({ ...state });

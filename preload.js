@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
 
   startWhatsApp: () => ipcRenderer.invoke('wa:start'),
   stopWhatsApp: () => ipcRenderer.invoke('wa:stop'),
+  restartWhatsApp: () => ipcRenderer.invoke('wa:restart'),
   whatsappStatus: () => ipcRenderer.invoke('wa:status'),
   testWhatsApp: (number, text) => ipcRenderer.invoke('wa:test', number, text),
   listGroups: () => ipcRenderer.invoke('wa:groups'),
