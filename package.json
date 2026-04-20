@@ -1,6 +1,6 @@
 {
   "name": "baratoprak-enerji-ihale-bot",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Baratoprak Enerji — EKAP v2 + ilan.gov.tr taraması yapar, anahtar kelime eşleşen ihaleleri WhatsApp üzerinden bildirir",
   "main": "main.js",
   "author": {
