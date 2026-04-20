@@ -150,7 +150,7 @@ async function runOnce() {
         break;
       }
       if (result.error) {
-        log(`EKAP sayfa ${page + 1} hatası: ${result.error}`, 'error');
+        log(`EKAP sayfa ${page + 1} hatası: ${result.error}${result.message ? ' — ' + result.message : ''}`, 'error');
         break;
       }
       const tenders = result.tenders || [];

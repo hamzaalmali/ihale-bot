@@ -59,6 +59,22 @@ const insecureAgent = new https.Agent({
   secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
 });
 
+// Node/Electron fetch (undici tabanlı) için dispatcher — `agent` yok sayılır,
+// doğru anahtar `dispatcher`'dır. Undici Agent ile TLS gevşetmesi burada uygulanır.
+let undiciDispatcher = null;
+try {
+  const { Agent: UndiciAgent } = require('undici');
+  undiciDispatcher = new UndiciAgent({
+    connect: { rejectUnauthorized: false },
+    keepAliveTimeout: 10_000,
+    keepAliveMaxTimeout: 30_000,
+    headersTimeout: 30_000,
+    bodyTimeout: 60_000,
+  });
+} catch (_) {
+  // undici yoksa sessizce fallback'e düşer
+}
+
 function aesCbcEncryptB64(plaintext, key, iv) {
   // AES-192-CBC (24-byte key) with PKCS7 padding (default).
   const cipher = crypto.createCipheriv('aes-192-cbc', key, iv);
@@ -117,17 +133,22 @@ function getSetCookieArray(res) {
 async function postJson(endpoint, payload) {
   const url = endpoint.startsWith('http') ? endpoint : BASE_URL + endpoint;
   const headers = { ...COMMON_HEADERS, ...generateSecurityHeaders() };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    // @ts-ignore: Electron/undici accepts a Node https.Agent for TLS relaxation
-    agent: insecureAgent,
-    dispatcher: undefined,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      dispatcher: undiciDispatcher, // TLS gevşetmesi (Python verify=False karşılığı)
+    });
+  } catch (err) {
+    const cause = err?.cause?.code || err?.cause?.message || err?.code || '';
+    const detail = cause ? ` (${cause})` : '';
+    throw new Error(`EKAP bağlantı hatası${detail}: ${err.message}`);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const err = new Error(`EKAP ${endpoint} HTTP ${res.status}`);
+    const err = new Error(`EKAP ${endpoint} HTTP ${res.status} — ${text.slice(0, 200)}`);
     err.status = res.status;
     err.body = text;
     throw err;
@@ -147,7 +168,7 @@ async function getLegacy(url, params, extraCookies = null) {
     method: 'GET',
     headers,
     redirect: 'manual',
-    agent: insecureAgent,
+    dispatcher: undiciDispatcher,
   });
   mergeSetCookies(getSetCookieArray(res));
 
@@ -159,7 +180,7 @@ async function getLegacy(url, params, extraCookies = null) {
       method: 'GET',
       headers: { ...LEGACY_HEADERS, Cookie: jarAsHeader() },
       redirect: 'manual',
-      agent: insecureAgent,
+      dispatcher: undiciDispatcher,
     });
     mergeSetCookies(getSetCookieArray(res2));
     if (!res2.ok) {
@@ -182,7 +203,7 @@ async function warmupLegacy() {
         Connection: 'keep-alive',
       },
       redirect: 'follow',
-      agent: insecureAgent,
+      dispatcher: undiciDispatcher,
     });
     mergeSetCookies(getSetCookieArray(r1));
   } catch (_) {}
@@ -198,7 +219,7 @@ async function warmupLegacy() {
           Connection: 'keep-alive',
         },
         redirect: 'follow',
-        agent: insecureAgent,
+        dispatcher: undiciDispatcher,
       }
     );
     mergeSetCookies(getSetCookieArray(r2));

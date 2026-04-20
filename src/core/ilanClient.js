@@ -35,15 +35,26 @@ const insecureAgent = new https.Agent({
   secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
 });
 
+let undiciDispatcher = null;
+try {
+  const { Agent: UndiciAgent } = require('undici');
+  undiciDispatcher = new UndiciAgent({
+    connect: { rejectUnauthorized: false },
+    keepAliveTimeout: 10_000,
+    keepAliveMaxTimeout: 30_000,
+  });
+} catch (_) {}
+
 async function postJson(endpoint, payload) {
   const res = await fetch(BASE_URL + endpoint, {
     method: 'POST',
     headers: HEADERS,
     body: JSON.stringify(payload),
-    agent: insecureAgent,
+    dispatcher: undiciDispatcher,
   });
   if (!res.ok) {
-    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status}`);
+    const body = await res.text().catch(() => '');
+    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${body.slice(0, 160)}`);
     err.status = res.status;
     throw err;
   }
@@ -55,10 +66,11 @@ async function getJson(endpoint, params) {
   const res = await fetch(`${BASE_URL}${endpoint}?${qs}`, {
     method: 'GET',
     headers: HEADERS,
-    agent: insecureAgent,
+    dispatcher: undiciDispatcher,
   });
   if (!res.ok) {
-    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status}`);
+    const body = await res.text().catch(() => '');
+    const err = new Error(`ilan.gov.tr ${endpoint} HTTP ${res.status} — ${body.slice(0, 160)}`);
     err.status = res.status;
     throw err;
   }
