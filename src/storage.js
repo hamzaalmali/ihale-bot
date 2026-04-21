@@ -34,17 +34,17 @@ const DEFAULT_CONFIG = {
     'Alakasız: giyim, gıda, yemek, ilaç, yakıt, temizlik, inşaat/bina yapımı, ' +
     'yol/asfalt, mobilya, IT/bilgisayar/yazılım (SCADA dışı), kırtasiye, ' +
     'araç kiralama/taşıma, personel hizmeti.',
-  aiMinConfidence: 0.5,
+  aiMinConfidence: 0.7,
   messageTemplate:
     'Yeni ihale bulundu 🔔\n\n' +
-    'Anahtar: {keyword}\n' +
     'Başlık: {title}\n' +
     'İdare: {authority}\n' +
     'Şehir: {province}\n' +
     'Tür: {type}\n' +
     'Durum: {status}\n' +
     'İhale Tarihi: {tenderDate}\n' +
-    'IKN: {ikn}\n\n' +
+    'IKN: {ikn}\n' +
+    'AI Değerlendirmesi: {aiReason} (güven %{aiConfidence})\n\n' +
     '{url}',
 };
 

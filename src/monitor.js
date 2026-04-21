@@ -57,9 +57,9 @@ function hitsBlacklist(tender, blacklist) {
   return null;
 }
 
-function formatMessage(tender, keyword, template) {
+function formatMessage(tender, keyword, template, ai) {
   const vars = {
-    keyword,
+    keyword: keyword || '',
     title: tender.name || '(başlık yok)',
     authority: tender.authority || '-',
     province: tender.province || '-',
@@ -69,6 +69,8 @@ function formatMessage(tender, keyword, template) {
     status: tender.status?.description || '-',
     method: tender.method || '-',
     url: tender.document_url || '',
+    aiReason: ai?.reason || '-',
+    aiConfidence: ai && typeof ai.confidence === 'number' ? Math.round(ai.confidence * 100) : '-',
   };
   return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
 }
@@ -336,7 +338,7 @@ async function runOnce() {
       const { tender, dedupeKey, ai: aiVerdict } = c;
       seen.add(dedupeKey);
       newIkns.push(dedupeKey);
-      const message = formatMessage(tender, '', cfg.messageTemplate);
+      const message = formatMessage(tender, '', cfg.messageTemplate, aiVerdict);
       const record = { keyword: '', ikn: tender.ikn, tender, message, sent: [], ai: aiVerdict };
 
       if (wa.isReady() && cfg.recipients?.length) {
