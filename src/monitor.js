@@ -363,13 +363,11 @@ async function runOnce() {
       emitMatch(record);
     }
 
-    // Seen'e SADECE AI tarafından değerlendirilmiş (onaylı ya da reddedilmiş) adayları ekle.
-    // AI değerlendiremediği (kota dolmuş) adaylar bir sonraki taramada tekrar denenecek.
+    // TÜM adaylar seen'e eklenir — AI değerlendiremese bile tekrar sorulmaz.
+    // Yeniden değerlendirme için Ayarlar → Hafızayı Sıfırla gerekir.
     for (const c of candidates) {
-      if (c.ai !== null && c.ai !== undefined) {
-        seen.add(c.dedupeKey);
-        newIkns.push(c.dedupeKey);
-      }
+      seen.add(c.dedupeKey);
+      newIkns.push(c.dedupeKey);
     }
 
     if (newIkns.length) storage.addSeen(newIkns);
